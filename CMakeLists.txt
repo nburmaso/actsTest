@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(hw)
+project(actsTest)
 
 # soft installation path
 set(SW $ENV{HOME}/mpd/sw/slc7_x86-64)
