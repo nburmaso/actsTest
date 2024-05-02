@@ -1,3 +1,6 @@
+
+#include "Acts/EventData/SourceLink.hpp"
+
 #include "Acts/Utilities/Logger.hpp"
 #include "Acts/MagneticField/ConstantBField.hpp"
 #include "Acts/Definitions/Algebra.hpp"
@@ -34,6 +37,9 @@
 #include "Acts/Geometry/DiscLayer.hpp"
 #include "Acts/Geometry/LayerArrayCreator.hpp"
 #include "Acts/Geometry/CylinderVolumeBounds.hpp"
+
+#include "Acts/Geometry/PlaneLayer.hpp"
+#include "Acts/Geometry/CuboidVolumeBounds.hpp"
 //  native units: mm, GeV, c=1, e=1
 
 class MyDetectorElement : public Acts::DetectorElementBase
@@ -57,10 +63,10 @@ private:
 int main()
 {
   // Logger
-  Acts::Logging::Level logLevel = Acts::Logging::ERROR;
-  Acts::Logging::Level logLevelFatras = Acts::Logging::ERROR;
-  Acts::Logging::Level logLevelDigi = Acts::Logging::ERROR;
-  Acts::Logging::Level logLevelSeed = Acts::Logging::ERROR;
+  Acts::Logging::Level logLevel = Acts::Logging::VERBOSE;
+  Acts::Logging::Level logLevelFatras = Acts::Logging::VERBOSE;
+  Acts::Logging::Level logLevelDigi = Acts::Logging::VERBOSE;
+  Acts::Logging::Level logLevelSeed = Acts::Logging::VERBOSE;
   Acts::Logging::Level logLevelFinder = Acts::Logging::VERBOSE;
 
   // Random number generator config
@@ -102,17 +108,20 @@ int main()
   // Construct the surfaces and layers
   std::vector<std::shared_ptr<MyDetectorElement>> detectorStore;
   Acts::LayerVector layVec;
-  const auto rBounds = std::make_shared<const Acts::RadialBounds>(rMin, rMax);
+  //const auto rBounds = std::make_shared<const Acts::RadialBounds>(rMin, rMax);  // <- for disk-like layers
+  const auto pBounds = std::make_shared<const Acts::RectangleBounds>(rMax, rMax); // <- for square-like layers
   for (unsigned int i = 0; i < positions.size(); i++)
   {
     Acts::Translation3 trans(0, 0, positions[i]);
     Acts::Transform3 trafo(trans);
     // create surface
-    auto surface = Acts::Surface::makeShared<Acts::DiscSurface>(trafo, rMin, rMax);
+    // auto surface = Acts::Surface::makeShared<Acts::DiscSurface>(trafo, rMin, rMax); // <- for disk-like layers
+    auto surface = Acts::Surface::makeShared<Acts::PlaneSurface>(trafo, pBounds); // <- for square-like layers
     surface->assignSurfaceMaterial(std::move(surfaceMaterial));
     auto surArray = std::unique_ptr<Acts::SurfaceArray>(new Acts::SurfaceArray(surface));
     // create layer
-    auto layer = Acts::DiscLayer::create(trafo, rBounds, std::move(surArray), 1._mm);
+    // auto layer = Acts::DiscLayer::create(trafo, rBounds, std::move(surArray), 1._mm); // <- for disk-like layers
+    auto layer = Acts::PlaneLayer::create(trafo, pBounds, std::move(surArray), 1._mm); // <- for square-like layers
     surface->associateLayer(*layer.get());
     layVec.push_back(layer);
     // create detector element
@@ -132,7 +141,8 @@ int main()
   Acts::Translation3 transVol(0, 0, (positions.front() + positions.back()) * 0.5);
   Acts::Transform3 trafoVol(transVol);
   auto length = positions.back() - positions.front();
-  auto boundsVol = std::make_shared<const Acts::CylinderVolumeBounds>(rMin - 5._mm, rMax + 5._mm, length + 10._mm);
+  auto boundsVol = std::make_shared<const Acts::CuboidVolumeBounds>(rMax + 5._mm, rMax + 5._mm, length + 10._mm);
+  // auto boundsVol = std::make_shared<const Acts::CylinderVolumeBounds>(rMin - 5._mm, rMax + 5._mm, length + 10._mm);
   auto trackVolume = Acts::TrackingVolume::create(trafoVol, boundsVol, nullptr, std::move(layArr), nullptr, {}, "Telescope");
 
   // Build tracking geometry
@@ -236,8 +246,9 @@ int main()
   trackFindingCfg.inputSourceLinks = digiCfg.outputSourceLinks;
   trackFindingCfg.inputInitialTrackParameters = paramsEstimationCfg.outputTrackParameters;
   trackFindingCfg.outputTracks = "tracks";
+  trackFindingCfg.measurementSelectorCfg = {{Acts::GeometryIdentifier(),{{}, {std::numeric_limits<double>::max()}, {1u}}}}; //chi2cut, numberOfMeasurementsPerSurface
   trackFindingCfg.findTracks = ActsExamples::TrackFindingAlgorithm::makeTrackFinderFunction(
-    trackingGeometry, fatrasConfig.magneticField,*Acts::getDefaultLogger("TrackFinder", logLevel));
+    trackingGeometry, fatrasConfig.magneticField,*Acts::getDefaultLogger("TrackFinder", logLevelFinder));
 
   // write track states from CKF
   ActsExamples::RootTrackStatesWriter::Config trackStatesWriter;
@@ -254,6 +265,7 @@ int main()
   simhitWriterConfig.inputSimHits = fatrasConfig.outputSimHits;
   simhitWriterConfig.filePath = "hits.root";
 
+  // Measurement writer
   ActsExamples::CsvMeasurementWriter::Config measWriterCfg;
   measWriterCfg.inputMeasurements = digiCfg.outputMeasurements;
   measWriterCfg.inputMeasurementSimHitsMap = digiCfg.outputMeasurementSimHitsMap;
@@ -276,7 +288,7 @@ int main()
   // Sequencer config
   ActsExamples::Sequencer::Config sequencerConfig;
   sequencerConfig.numThreads = 1;
-  sequencerConfig.events = 1;
+  sequencerConfig.events = 10;
   sequencerConfig.logLevel = logLevel;
 
   // Start sequencer
