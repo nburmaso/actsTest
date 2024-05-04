@@ -25,6 +25,8 @@
 #include "ActsExamples/TrackFinding/TrackParamsEstimationAlgorithm.hpp"
 #include "ActsExamples/TrackFinding/TrackFindingAlgorithm.hpp"
 #include "ActsExamples/Io/Root/RootTrackStatesWriter.hpp"
+#include "ActsExamples/Io/Root/RootParticleWriter.hpp"
+#include "ActsExamples/Io/Root/RootParticleReader.hpp"
 #include "ActsExamples/Io/Csv/CsvMeasurementWriter.hpp"
 // Temporary
 #include "ActsExamples/TruthTracking/TruthSeedingAlgorithm.hpp"
@@ -63,11 +65,15 @@ private:
 int main()
 {
   // Logger
-  Acts::Logging::Level logLevel = Acts::Logging::VERBOSE;
-  Acts::Logging::Level logLevelFatras = Acts::Logging::VERBOSE;
-  Acts::Logging::Level logLevelDigi = Acts::Logging::VERBOSE;
-  Acts::Logging::Level logLevelSeed = Acts::Logging::VERBOSE;
-  Acts::Logging::Level logLevelFinder = Acts::Logging::VERBOSE;
+  Acts::Logging::Level logLevel = Acts::Logging::INFO;
+  Acts::Logging::Level logLevelFatras = Acts::Logging::INFO;
+  Acts::Logging::Level logLevelDigi = Acts::Logging::INFO;
+  Acts::Logging::Level logLevelSeed = Acts::Logging::INFO;
+  Acts::Logging::Level logLevelFinder = Acts::Logging::INFO;
+  Acts::Logging::Level logLevelSequencer = Acts::Logging::ERROR;
+
+  // collection names
+  std::string particles = "particles";
 
   // Random number generator config
   auto rnd = std::make_shared<ActsExamples::RandomNumbers>(ActsExamples::RandomNumbers::Config({42}));
@@ -84,9 +90,14 @@ int main()
       std::make_shared<ActsExamples::FixedVertexGenerator>(),
       std::make_shared<ActsExamples::ParametricParticleGenerator>(genConfig)};
   ActsExamples::EventGenerator::Config evgenConfig;
-  evgenConfig.outputParticles = "particles";
+  evgenConfig.outputParticles = particles;
   evgenConfig.generators = {gen};
   evgenConfig.randomNumbers = rnd;
+
+  // Particle reader config
+  ActsExamples::RootParticleReader::Config particleReaderCfg;
+  particleReaderCfg.particleCollection = particles;
+  particleReaderCfg.filePath = "urqmd.root";
 
   // Telescope
   // std::shared_ptr<const Acts::IMaterialDecorator> matDecorator = std::make_shared<const Acts::MaterialWiper>();
@@ -95,10 +106,15 @@ int main()
   // auto telescopePair = telescope.finalize(telescopeConfig, matDecorator); // std::pair<TrackingGeometryPtr, ContextDecorators>
 
   // Detector parameters
-  std::vector<double> positions{{60, 90, 120, 150, 180, 210}}; // z-positions of sensitive layers
-  double thickness{50_um};                                     // 
-  double rMin{9_mm};
-  double rMax{100_mm};
+  // std::vector<double> positions{{60, 90, 120, 150, 180, 210}}; // z-positions of sensitive layers
+  // double thickness{50_um};                                     //
+  // double rMin{9_mm};
+  // double rMax{100_mm};
+  std::vector<double> positions{{2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000}}; // z-positions of sensitive layers
+  double thickness{50_um};                                                                     
+  double rMin{357_mm};
+  double rMax{1300_mm};
+  double bz = 0.5_T;
 
   // Create materials
   Acts::Material silicon = Acts::Material::fromMassDensity(9.370_cm, 46.52_cm, 28.0855, 14, 2.329_g / 1_cm3);
@@ -108,7 +124,7 @@ int main()
   // Construct the surfaces and layers
   std::vector<std::shared_ptr<MyDetectorElement>> detectorStore;
   Acts::LayerVector layVec;
-  //const auto rBounds = std::make_shared<const Acts::RadialBounds>(rMin, rMax);  // <- for disk-like layers
+  // const auto rBounds = std::make_shared<const Acts::RadialBounds>(rMin, rMax);  // <- for disk-like layers
   const auto pBounds = std::make_shared<const Acts::RectangleBounds>(rMax, rMax); // <- for square-like layers
   for (unsigned int i = 0; i < positions.size(); i++)
   {
@@ -138,11 +154,13 @@ int main()
   std::unique_ptr<const Acts::LayerArray> layArr(layArrCreator.layerArray(context, layVec, positions.front() - 2._mm, positions.back() + 2._mm, Acts::BinningType::arbitrary, Acts::BinningValue::binZ));
 
   // Build mother tracking volume
-  Acts::Translation3 transVol(0, 0, (positions.front() + positions.back()) * 0.5);
+  //Acts::Translation3 transVol(0, 0, (positions.front() + positions.back()) * 0.5);
+  Acts::Translation3 transVol(0, 0, 0);
   Acts::Transform3 trafoVol(transVol);
-  auto length = positions.back() - positions.front();
-  auto boundsVol = std::make_shared<const Acts::CuboidVolumeBounds>(rMax + 5._mm, rMax + 5._mm, length + 10._mm);
-  // auto boundsVol = std::make_shared<const Acts::CylinderVolumeBounds>(rMin - 5._mm, rMax + 5._mm, length + 10._mm);
+  auto halfLength = (positions.back() - positions.front())/2.;
+  // auto boundsVol = std::make_shared<const Acts::CylinderVolumeBounds>(rMin - 5._mm, rMax + 5._mm, halfLength + 10._mm); // <- for disk-like layers
+  // auto boundsVol = std::make_shared<const Acts::CuboidVolumeBounds>(rMax + 5._mm, rMax + 5._mm, halfLength + 10._mm); // <- for square-like layers
+  auto boundsVol = std::make_shared<const Acts::CuboidVolumeBounds>(rMax + 5._mm, rMax + 5._mm, 3100.); // <- for square-like layers
   auto trackVolume = Acts::TrackingVolume::create(trafoVol, boundsVol, nullptr, std::move(layArr), nullptr, {}, "Telescope");
 
   // Build tracking geometry
@@ -168,13 +186,13 @@ int main()
 
   // Fatras config
   ActsExamples::FatrasSimulation::Config fatrasConfig;
-  fatrasConfig.inputParticles = evgenConfig.outputParticles;
+  fatrasConfig.inputParticles = particles;
   fatrasConfig.outputParticlesInitial = "initial";
   fatrasConfig.outputParticlesFinal = "final";
   fatrasConfig.outputSimHits = "simhits";
   // fatrasConfig.trackingGeometry = telescopePair.first;
   fatrasConfig.trackingGeometry = trackingGeometry;
-  fatrasConfig.magneticField = std::make_shared<Acts::ConstantBField>(Acts::Vector3(0.0, 0.0, 1._T));
+  fatrasConfig.magneticField = std::make_shared<Acts::ConstantBField>(Acts::Vector3(0.0, 0.0, bz));
   fatrasConfig.randomNumbers = rnd;
 
   // Digitization config
@@ -209,26 +227,26 @@ int main()
   ActsExamples::SeedingAlgorithm::Config seedingCfg;
   seedingCfg.inputSpacePoints = {spConfig.outputSpacePoints};
   seedingCfg.outputSeeds = "seeds";
-  seedingCfg.gridOptions.bFieldInZ = 1_T;
-  seedingCfg.gridConfig.minPt = 0.5_GeV;
+  seedingCfg.gridOptions.bFieldInZ = bz;
+  seedingCfg.gridConfig.minPt = 0.1_GeV;
   seedingCfg.gridConfig.zMin = positions[0] - 1_mm;
   seedingCfg.gridConfig.zMax = positions[2] + 1_mm;
   seedingCfg.gridConfig.rMax = rMax;
   seedingCfg.gridConfig.deltaRMax = rMax - rMin;
   seedingCfg.gridConfig.cotThetaMax = 7.0;
-  seedingCfg.gridConfig.impactMax = 8_mm;
-  seedingCfg.seedFilterConfig.maxSeedsPerSpM = 1;
-  seedingCfg.seedFinderOptions.bFieldInZ        = seedingCfg.gridOptions.bFieldInZ;
-  seedingCfg.seedFinderConfig.impactMax         = seedingCfg.gridConfig.impactMax;
-  seedingCfg.seedFinderConfig.rMax              = seedingCfg.gridConfig.rMax;
-  seedingCfg.seedFinderConfig.deltaRMax         = seedingCfg.gridConfig.deltaRMax;
-  seedingCfg.seedFinderConfig.deltaRMaxTopSP    = seedingCfg.gridConfig.deltaRMax;
+  seedingCfg.gridConfig.impactMax = 200_mm;
+
+  seedingCfg.seedFinderOptions.bFieldInZ = seedingCfg.gridOptions.bFieldInZ;
+  seedingCfg.seedFinderConfig.impactMax = seedingCfg.gridConfig.impactMax;
+  seedingCfg.seedFinderConfig.rMax = seedingCfg.gridConfig.rMax;
+  seedingCfg.seedFinderConfig.deltaRMax = seedingCfg.gridConfig.deltaRMax;
+  seedingCfg.seedFinderConfig.deltaRMaxTopSP = seedingCfg.gridConfig.deltaRMax;
   seedingCfg.seedFinderConfig.deltaRMaxBottomSP = seedingCfg.gridConfig.deltaRMax;
-  seedingCfg.seedFinderConfig.zMin              = seedingCfg.gridConfig.zMin;
-  seedingCfg.seedFinderConfig.zMax              = seedingCfg.gridConfig.zMax;
-  seedingCfg.seedFinderConfig.cotThetaMax       = seedingCfg.gridConfig.cotThetaMax;
-  seedingCfg.seedFinderConfig.minPt             = seedingCfg.gridConfig.minPt;
-  seedingCfg.seedFinderConfig.maxSeedsPerSpM    = seedingCfg.seedFilterConfig.maxSeedsPerSpM;
+  seedingCfg.seedFinderConfig.zMin = seedingCfg.gridConfig.zMin;
+  seedingCfg.seedFinderConfig.zMax = seedingCfg.gridConfig.zMax;
+  seedingCfg.seedFinderConfig.cotThetaMax = seedingCfg.gridConfig.cotThetaMax;
+  seedingCfg.seedFinderConfig.minPt = seedingCfg.gridConfig.minPt;
+  seedingCfg.seedFinderConfig.maxSeedsPerSpM = seedingCfg.seedFilterConfig.maxSeedsPerSpM;
   seedingCfg.seedFinderConfig.deltaZMax = positions[2] - positions[0];
   seedingCfg.seedFinderConfig.rMinMiddle = rMin;
   seedingCfg.seedFinderConfig.rMaxMiddle = rMax;
@@ -246,19 +264,14 @@ int main()
   trackFindingCfg.inputSourceLinks = digiCfg.outputSourceLinks;
   trackFindingCfg.inputInitialTrackParameters = paramsEstimationCfg.outputTrackParameters;
   trackFindingCfg.outputTracks = "tracks";
-  trackFindingCfg.measurementSelectorCfg = {{Acts::GeometryIdentifier(),{{}, {std::numeric_limits<double>::max()}, {1u}}}}; //chi2cut, numberOfMeasurementsPerSurface
+  trackFindingCfg.measurementSelectorCfg = {{Acts::GeometryIdentifier(), {{}, {std::numeric_limits<double>::max()}, {1u}}}}; // chi2cut, numberOfMeasurementsPerSurface
   trackFindingCfg.findTracks = ActsExamples::TrackFindingAlgorithm::makeTrackFinderFunction(
-    trackingGeometry, fatrasConfig.magneticField,*Acts::getDefaultLogger("TrackFinder", logLevelFinder));
+      trackingGeometry, fatrasConfig.magneticField, *Acts::getDefaultLogger("TrackFinder", logLevelFinder));
 
-  // write track states from CKF
-  ActsExamples::RootTrackStatesWriter::Config trackStatesWriter;
-  trackStatesWriter.inputTracks = trackFindingCfg.outputTracks;
-  trackStatesWriter.inputParticles = evgenConfig.outputParticles;
-  trackStatesWriter.inputSimHits = fatrasConfig.outputSimHits;
-  trackStatesWriter.inputMeasurementParticlesMap = digiCfg.outputMeasurementParticlesMap;
-  trackStatesWriter.inputMeasurementSimHitsMap = digiCfg.outputMeasurementSimHitsMap;
-  trackStatesWriter.filePath = "trackstates_ckf.root";
-  trackStatesWriter.treeName = "trackstates";
+  // Particle writer config
+  ActsExamples::RootParticleWriter::Config particleWriterCfg;
+  particleWriterCfg.inputParticles = particles;
+  particleWriterCfg.filePath = "particles.root";
 
   // SimhitWriter config
   ActsExamples::RootSimHitWriter::Config simhitWriterConfig;
@@ -285,26 +298,38 @@ int main()
   seedWriterConfig.inputMeasurementSimHitsMap = digiCfg.outputMeasurementSimHitsMap;
   seedWriterConfig.outputDir = "seeds";
 
+  // write track states from CKF
+  ActsExamples::RootTrackStatesWriter::Config trackStatesWriter;
+  trackStatesWriter.inputTracks = trackFindingCfg.outputTracks;
+  trackStatesWriter.inputParticles = particles;
+  trackStatesWriter.inputSimHits = fatrasConfig.outputSimHits;
+  trackStatesWriter.inputMeasurementParticlesMap = digiCfg.outputMeasurementParticlesMap;
+  trackStatesWriter.inputMeasurementSimHitsMap = digiCfg.outputMeasurementSimHitsMap;
+  trackStatesWriter.filePath = "trackstates_ckf.root";
+  trackStatesWriter.treeName = "trackstates";
+
   // Sequencer config
   ActsExamples::Sequencer::Config sequencerConfig;
-  sequencerConfig.numThreads = 1;
+  sequencerConfig.numThreads = 6;
   sequencerConfig.events = 10;
-  sequencerConfig.logLevel = logLevel;
+  sequencerConfig.logLevel = logLevelSequencer;
 
   // Start sequencer
   ActsExamples::Sequencer sequencer(sequencerConfig);
-  sequencer.addReader(std::make_shared<ActsExamples::EventGenerator>(evgenConfig, logLevel));
+  // sequencer.addReader(std::make_shared<ActsExamples::EventGenerator>(evgenConfig, logLevel));
+  // sequencer.addWriter(std::make_shared<ActsExamples::RootParticleWriter>(particleWriterCfg, logLevel));
+  sequencer.addReader(std::make_shared<ActsExamples::RootParticleReader>(particleReaderCfg, logLevel));
   sequencer.addElement(std::make_shared<ActsExamples::FatrasSimulation>(fatrasConfig, logLevelFatras));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::DigitizationAlgorithm>(digiCfg, logLevelDigi));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::SpacePointMaker>(spConfig, logLevel));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::SeedingAlgorithm>(seedingCfg, logLevelSeed));
-  //sequencer.addAlgorithm(std::make_shared<ActsExamples::TruthSeedingAlgorithm>(truthSeedingCfg, logLevelSeed));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackParamsEstimationAlgorithm>(paramsEstimationCfg, logLevel));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackFindingAlgorithm>(trackFindingCfg, logLevelFinder));
   sequencer.addWriter(std::make_shared<ActsExamples::RootSimHitWriter>(simhitWriterConfig, logLevel));
+  sequencer.addAlgorithm(std::make_shared<ActsExamples::DigitizationAlgorithm>(digiCfg, logLevelDigi));
   sequencer.addWriter(std::make_shared<ActsExamples::CsvMeasurementWriter>(measWriterCfg, logLevel));
+  sequencer.addAlgorithm(std::make_shared<ActsExamples::SpacePointMaker>(spConfig, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootSpacepointWriter>(spWriterConfig, logLevel));
+  sequencer.addAlgorithm(std::make_shared<ActsExamples::SeedingAlgorithm>(seedingCfg, logLevelSeed));
+  // sequencer.addAlgorithm(std::make_shared<ActsExamples::TruthSeedingAlgorithm>(truthSeedingCfg, logLevelSeed));
+  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackParamsEstimationAlgorithm>(paramsEstimationCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::CsvSeedWriter>(seedWriterConfig, logLevel));
+  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackFindingAlgorithm>(trackFindingCfg, logLevelFinder));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackStatesWriter>(trackStatesWriter, logLevel));
 
   sequencer.run();
