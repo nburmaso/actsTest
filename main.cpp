@@ -15,7 +15,7 @@
 #include "ActsExamples/Framework/Sequencer.hpp"
 #include "ActsExamples/Fatras/FatrasSimulation.hpp"
 #include "ActsExamples/TelescopeDetector/TelescopeDetector.hpp"
-#include "ActsExamples/Geometry/MaterialWiper.hpp"
+//#include "ActsExamples/Geometry/MaterialWiper.hpp"
 #include "ActsExamples/Digitization/DigitizationAlgorithm.hpp"
 #include "ActsExamples/TrackFinding/SeedingAlgorithm.hpp"
 #include "ActsExamples/TrackFinding/SpacePointMaker.hpp"
@@ -28,6 +28,7 @@
 #include "ActsExamples/Io/Root/RootParticleWriter.hpp"
 #include "ActsExamples/Io/Root/RootParticleReader.hpp"
 #include "ActsExamples/Io/Csv/CsvMeasurementWriter.hpp"
+#include "ActsExamples/TruthTracking/TrackTruthMatcher.hpp"
 // Temporary
 #include "ActsExamples/TruthTracking/TruthSeedingAlgorithm.hpp"
 
@@ -74,6 +75,8 @@ int main()
 
   // collection names
   std::string particles = "particles";
+  std::string vertices = "vertices";
+  std::string tracks = "tracks";
 
   // Random number generator config
   auto rnd = std::make_shared<ActsExamples::RandomNumbers>(ActsExamples::RandomNumbers::Config({42}));
@@ -85,18 +88,20 @@ int main()
   genConfig.thetaMax = 0.40;
   genConfig.pMin = 3.0_GeV;
   genConfig.pMax = 3.1_GeV;
+  genConfig.pTransverse = true;
   ActsExamples::EventGenerator::Generator gen{
       std::make_shared<ActsExamples::FixedMultiplicityGenerator>(1),
-      std::make_shared<ActsExamples::FixedVertexGenerator>(),
+      std::make_shared<ActsExamples::FixedPrimaryVertexPositionGenerator>(),
       std::make_shared<ActsExamples::ParametricParticleGenerator>(genConfig)};
   ActsExamples::EventGenerator::Config evgenConfig;
   evgenConfig.outputParticles = particles;
+  evgenConfig.outputVertices = vertices;
   evgenConfig.generators = {gen};
   evgenConfig.randomNumbers = rnd;
 
   // Particle reader config
   ActsExamples::RootParticleReader::Config particleReaderCfg;
-  particleReaderCfg.particleCollection = particles;
+  particleReaderCfg.treeName = particles;
   particleReaderCfg.filePath = "urqmd.root";
 
   // Telescope
@@ -161,8 +166,7 @@ int main()
   // auto boundsVol = std::make_shared<const Acts::CylinderVolumeBounds>(rMin - 5._mm, rMax + 5._mm, halfLength + 10._mm); // <- for disk-like layers
   // auto boundsVol = std::make_shared<const Acts::CuboidVolumeBounds>(rMax + 5._mm, rMax + 5._mm, halfLength + 10._mm); // <- for square-like layers
   auto boundsVol = std::make_shared<const Acts::CuboidVolumeBounds>(rMax + 5._mm, rMax + 5._mm, 3100.); // <- for square-like layers
-  auto trackVolume = Acts::TrackingVolume::create(trafoVol, boundsVol, nullptr, std::move(layArr), nullptr, {}, "Telescope");
-
+  auto trackVolume = std::make_shared<Acts::TrackingVolume>(trafoVol, boundsVol, nullptr, std::move(layArr), nullptr, Acts::MutableTrackingVolumeVector{}, "Telescope");
   // Build tracking geometry
   auto trackingGeometry = std::make_shared<Acts::TrackingGeometry>(trackVolume);
 
@@ -263,10 +267,20 @@ int main()
   trackFindingCfg.inputMeasurements = digiCfg.outputMeasurements;
   trackFindingCfg.inputSourceLinks = digiCfg.outputSourceLinks;
   trackFindingCfg.inputInitialTrackParameters = paramsEstimationCfg.outputTrackParameters;
-  trackFindingCfg.outputTracks = "tracks";
+  trackFindingCfg.outputTracks = tracks;
+  trackFindingCfg.trackingGeometry = trackingGeometry;
+  trackFindingCfg.magneticField = fatrasConfig.magneticField;
   trackFindingCfg.measurementSelectorCfg = {{Acts::GeometryIdentifier(), {{}, {std::numeric_limits<double>::max()}, {1u}}}}; // chi2cut, numberOfMeasurementsPerSurface
   trackFindingCfg.findTracks = ActsExamples::TrackFindingAlgorithm::makeTrackFinderFunction(
       trackingGeometry, fatrasConfig.magneticField, *Acts::getDefaultLogger("TrackFinder", logLevelFinder));
+
+  // Track truth matcher
+  ActsExamples::TrackTruthMatcher::Config trackTruthMatcherCfg;
+  trackTruthMatcherCfg.inputTracks = tracks;
+  trackTruthMatcherCfg.inputParticles = particles;
+  trackTruthMatcherCfg.inputMeasurementParticlesMap = digiCfg.outputMeasurementParticlesMap;
+  trackTruthMatcherCfg.outputTrackParticleMatching = "track_particle_matching";
+  trackTruthMatcherCfg.outputParticleTrackMatching = "particle_track_matching";
 
   // Particle writer config
   ActsExamples::RootParticleWriter::Config particleWriterCfg;
@@ -303,22 +317,24 @@ int main()
   trackStatesWriter.inputTracks = trackFindingCfg.outputTracks;
   trackStatesWriter.inputParticles = particles;
   trackStatesWriter.inputSimHits = fatrasConfig.outputSimHits;
-  trackStatesWriter.inputMeasurementParticlesMap = digiCfg.outputMeasurementParticlesMap;
+  trackStatesWriter.inputTrackParticleMatching = trackTruthMatcherCfg.outputTrackParticleMatching;
+  // trackStatesWriter.inputMeasurementParticlesMap = digiCfg.outputMeasurementParticlesMap; // depricated
   trackStatesWriter.inputMeasurementSimHitsMap = digiCfg.outputMeasurementSimHitsMap;
   trackStatesWriter.filePath = "trackstates_ckf.root";
   trackStatesWriter.treeName = "trackstates";
 
   // Sequencer config
   ActsExamples::Sequencer::Config sequencerConfig;
-  sequencerConfig.numThreads = 6;
+  sequencerConfig.numThreads = 1;
   sequencerConfig.events = 10;
   sequencerConfig.logLevel = logLevelSequencer;
 
   // Start sequencer
   ActsExamples::Sequencer sequencer(sequencerConfig);
-  // sequencer.addReader(std::make_shared<ActsExamples::EventGenerator>(evgenConfig, logLevel));
+  sequencer.addReader(std::make_shared<ActsExamples::EventGenerator>(evgenConfig, logLevel));
   // sequencer.addWriter(std::make_shared<ActsExamples::RootParticleWriter>(particleWriterCfg, logLevel));
-  sequencer.addReader(std::make_shared<ActsExamples::RootParticleReader>(particleReaderCfg, logLevel));
+  // sequencer.addReader(std::make_shared<ActsExamples::RootParticleReader>(particleReaderCfg, logLevel));
+
   sequencer.addElement(std::make_shared<ActsExamples::FatrasSimulation>(fatrasConfig, logLevelFatras));
   sequencer.addWriter(std::make_shared<ActsExamples::RootSimHitWriter>(simhitWriterConfig, logLevel));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::DigitizationAlgorithm>(digiCfg, logLevelDigi));
@@ -326,10 +342,13 @@ int main()
   sequencer.addAlgorithm(std::make_shared<ActsExamples::SpacePointMaker>(spConfig, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootSpacepointWriter>(spWriterConfig, logLevel));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::SeedingAlgorithm>(seedingCfg, logLevelSeed));
+ 
   // sequencer.addAlgorithm(std::make_shared<ActsExamples::TruthSeedingAlgorithm>(truthSeedingCfg, logLevelSeed));
+ 
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackParamsEstimationAlgorithm>(paramsEstimationCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::CsvSeedWriter>(seedWriterConfig, logLevel));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackFindingAlgorithm>(trackFindingCfg, logLevelFinder));
+  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackTruthMatcher>(trackTruthMatcherCfg, logLevelFinder));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackStatesWriter>(trackStatesWriter, logLevel));
 
   sequencer.run();
