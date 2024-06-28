@@ -19,6 +19,9 @@ private:
   double mThickness = 0.;
 };
 
+std::vector<std::shared_ptr<MyDetectorElement>> detectorStore;
+Acts::GeometryContext gctx;
+
 Acts::TrackingGeometry* CreateTrackingGeometry(){
   // Create materials
   double radLenSilicon = 9.370_cm;
@@ -30,9 +33,7 @@ Acts::TrackingGeometry* CreateTrackingGeometry(){
   const auto surfaceMaterial = std::make_shared<Acts::HomogeneousSurfaceMaterial>(matProp);
 
   // Construct the surfaces and layers
-  std::vector<std::shared_ptr<MyDetectorElement>> detectorStore;
   Acts::LayerVector layVec;
-  Acts::GeometryContext gctx;
 
   if (1) {
     double eps = 1e-10;

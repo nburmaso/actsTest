@@ -49,14 +49,10 @@
 #include "tracker_config.h"
 #include "tracker.h"
 
-
-
-
-
 int main(){
   // Logger
   Acts::Logging::Level logLevel = Acts::Logging::INFO;
-  Acts::Logging::Level logLevelFatras = Acts::Logging::VERBOSE;
+  Acts::Logging::Level logLevelFatras = Acts::Logging::INFO;
   Acts::Logging::Level logLevelDigi = Acts::Logging::INFO;
   Acts::Logging::Level logLevelSeed = Acts::Logging::INFO;
   Acts::Logging::Level logLevelFinder = Acts::Logging::INFO;
@@ -261,7 +257,7 @@ int main(){
   sequencer.addElement(std::make_shared<ActsExamples::FatrasSimulation>(fatrasConfig, logLevelFatras));
   sequencer.addWriter(std::make_shared<ActsExamples::RootSimHitWriter>(simhitWriterConfig, logLevel));
 //  sequencer.addReader(std::make_shared<ActsExamples::RootSimHitReader>(simhitReaderConfig, logLevel));
-/*
+
   sequencer.addAlgorithm(std::make_shared<ActsExamples::DigitizationAlgorithm>(digiCfg, logLevelDigi));
   sequencer.addWriter(std::make_shared<ActsExamples::CsvMeasurementWriter>(measWriterCfg, logLevel));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::SpacePointMaker>(spConfig, logLevel));
@@ -276,7 +272,6 @@ int main(){
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackTruthMatcher>(trackTruthMatcherCfg, logLevelMatcher));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackStatesWriter>(trackStatesWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackSummaryWriter>(trackSummaryWriterCfg, logLevel));
-*/
   sequencer.run();
 
   return 0;
