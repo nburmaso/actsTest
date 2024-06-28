@@ -9,6 +9,8 @@
 #include "TEllipse.h"
 #include "TGraphErrors.h"
 
+#include "style.h"
+
 using namespace std;
 
 // data from RootTrackSummaryReader.hpp
@@ -172,15 +174,17 @@ void SetBranchAddresses(TTree* m_inputChain){
 }
 
 void analyse_summary(){
-  TFile* f = new TFile("tracksummary.root");
+  TFile* f = new TFile("build/tracksummary.root");
   TTree* t = (TTree*) f->Get("tracksummary");
   SetBranchAddresses(t);
   int nEvents = t->GetEntries();
 
-  TH1D* h_eQOP_fit = new TH1D("h_eQOP_fit","",100,-2,0);
-  TH1D* h_eLOC0_fit = new TH1D("h_eLOC0_fit","",200,-100,100);
-  TH1D* h_eLOC1_fit = new TH1D("h_eLOC1_fit","",200,-100,100);
-  TH1D* h_pull_eQOP_fit = new TH1D("h_pull_eQOP_fit","",100,-10,10);
+  TH1D* h_eQOP_fit = new TH1D("h_eQOP_fit","",200,0,2);
+  TH1D* h_eLOC0_fit = new TH1D("h_eLOC0_fit","",200,-90,90);
+  TH1D* h_eLOC1_fit = new TH1D("h_eLOC1_fit","",200,-90,90);
+  TH1D* h_pull_eQOP_fit = new TH1D("h_pull_eQOP_fit","",200,-10,10);
+  TH1D* h_pull_eLOC0_fit = new TH1D("h_pull_eLOC0_fit","",200,-10,10);
+  TH1D* h_pull_eLOC1_fit = new TH1D("h_pull_eLOC1_fit","",200,-10,10);
 
   for (int ev=0; ev<nEvents; ev++){
     t->GetEntry(ev);
@@ -190,11 +194,10 @@ void analyse_summary(){
       h_eLOC0_fit->Fill(m_eLOC0_fit->at(tr));
       h_eLOC1_fit->Fill(m_eLOC1_fit->at(tr));
       h_pull_eQOP_fit->Fill(m_pull_eQOP_fit->at(tr));
+      h_pull_eLOC0_fit->Fill(m_pull_eLOC0_fit->at(tr));
+      h_pull_eLOC1_fit->Fill(m_pull_eLOC1_fit->at(tr));
     }
   }
-
-  new TCanvas;
-  h_eQOP_fit->Draw();
 
   new TCanvas;
   h_eLOC0_fit->Draw();
@@ -204,4 +207,52 @@ void analyse_summary(){
 
   new TCanvas;
   h_pull_eQOP_fit->Draw();
+
+  new TCanvas;
+  h_pull_eLOC0_fit->Draw();
+
+  new TCanvas;
+  h_pull_eLOC1_fit->Draw();
+
+  gStyle->SetOptFit(1);
+
+  new TCanvas;
+  SetHisto(h_eQOP_fit,";q/p (1/GeV)");
+  SetPad(gPad);
+  h_eQOP_fit->Draw();
+
+  TCanvas* cPulls = new TCanvas("cPulls","",1900,800);
+  cPulls->Divide(3,2,0.001,0.001);
+  cPulls->cd(1);
+  SetPad(gPad);
+  SetHisto(h_eLOC0_fit,";d (mm)");
+  h_eLOC0_fit->Draw();
+  
+  cPulls->cd(2);
+  SetPad(gPad);
+  SetHisto(h_eLOC1_fit,";z (mm)");
+  h_eLOC1_fit->Draw();
+
+  cPulls->cd(3);
+  SetPad(gPad);
+  SetHisto(h_eQOP_fit,";q/p (1/GeV)");
+  h_eQOP_fit->Draw();
+  
+  cPulls->cd(4);
+  SetPad(gPad);
+  SetHisto(h_pull_eLOC0_fit,";pull d");
+  h_pull_eLOC0_fit->Draw();
+
+  cPulls->cd(5);
+  SetPad(gPad);
+  SetHisto(h_pull_eLOC1_fit,";pull z");
+  h_pull_eLOC1_fit->Draw();
+
+  cPulls->cd(6);
+  SetPad(gPad);
+  SetHisto(h_pull_eQOP_fit,";pull q/p");
+  h_pull_eQOP_fit->Draw();
+  h_pull_eQOP_fit->Fit("gaus","","",-2,2);
+
+  cPulls->Print("pulls.png");
 }

@@ -64,30 +64,34 @@ int main(){
   std::string vertices = "vertices";
   std::string tracks = "tracks";
   std::string simhits = "simhits";
+  std::string seeds = "seeds";
 
   // Random number generator config
   auto rnd = std::make_shared<ActsExamples::RandomNumbers>(ActsExamples::RandomNumbers::Config({42}));
+
+  int nEvents = 10000;
 
   // Particle gun generator config
   double etaMin = 2.0;
   double etaMax = 2.0+1.e-100;
 
-  ActsExamples::ParametricParticleGenerator::Config genConfig;
-  genConfig.etaUniform = true;
-  genConfig.thetaMin = 2 * atan(exp(-etaMax));
-  genConfig.thetaMax = 2 * atan(exp(-etaMin));
-  genConfig.pMin = 0.2_GeV;
-  genConfig.pMax = 0.2_GeV+1.e-100_GeV;
-  genConfig.pTransverse = true;
+  ActsExamples::ParametricParticleGenerator::Config genCfg;
+  genCfg.etaUniform = true;
+  genCfg.thetaMin = 2 * atan(exp(-etaMax));
+  genCfg.thetaMax = 2 * atan(exp(-etaMin));
+  genCfg.pMin = 0.2_GeV;
+  genCfg.pMax = 0.2_GeV+1.e-100_GeV;
+  genCfg.pTransverse = true;
+  genCfg.pdg = Acts::PdgParticle::eAntiMuon;
   ActsExamples::EventGenerator::Generator gen{
       std::make_shared<ActsExamples::FixedMultiplicityGenerator>(1),
       std::make_shared<ActsExamples::FixedPrimaryVertexPositionGenerator>(),
-      std::make_shared<ActsExamples::ParametricParticleGenerator>(genConfig)};
-  ActsExamples::EventGenerator::Config evgenConfig;
-  evgenConfig.outputParticles = particles;
-  evgenConfig.outputVertices = vertices;
-  evgenConfig.generators = {gen};
-  evgenConfig.randomNumbers = rnd;
+      std::make_shared<ActsExamples::ParametricParticleGenerator>(genCfg)};
+  ActsExamples::EventGenerator::Config evgenCfg;
+  evgenCfg.outputParticles = particles;
+  evgenCfg.outputVertices = vertices;
+  evgenCfg.generators = {gen};
+  evgenCfg.randomNumbers = rnd;
 
   // Particle reader config
   ActsExamples::RootParticleReader::Config particleReaderCfg;
@@ -99,14 +103,14 @@ int main(){
   auto trackingGeometry = std::make_shared<Acts::TrackingGeometry>(*trackingGeometryPtr);
 
   // Fatras config
-  ActsExamples::FatrasSimulation::Config fatrasConfig;
-  fatrasConfig.inputParticles = particles;
-  fatrasConfig.outputParticlesInitial = "initial";
-  fatrasConfig.outputParticlesFinal = "final";
-  fatrasConfig.outputSimHits = simhits;
-  fatrasConfig.trackingGeometry = trackingGeometry;
-  fatrasConfig.magneticField = std::make_shared<Acts::ConstantBField>(Acts::Vector3(0.0, 0.0, bz));
-  fatrasConfig.randomNumbers = rnd;
+  ActsExamples::FatrasSimulation::Config fatrasCfg;
+  fatrasCfg.inputParticles = particles;
+  fatrasCfg.outputParticlesInitial = "initial";
+  fatrasCfg.outputParticlesFinal = "final";
+  fatrasCfg.outputSimHits = simhits;
+  fatrasCfg.trackingGeometry = trackingGeometry;
+  fatrasCfg.magneticField = std::make_shared<Acts::ConstantBField>(Acts::Vector3(0.0, 0.0, bz));
+  fatrasCfg.randomNumbers = rnd;
 
   // Digitization config
   bool doMerge = 0;
@@ -119,18 +123,18 @@ int main(){
   digiCfg.digitizationConfigs = ActsExamples::readDigiConfigFromJson("digi-smearing-config.json");
 
   // Create space points
-  ActsExamples::SpacePointMaker::Config spConfig;
-  spConfig.inputSourceLinks = digiCfg.outputSourceLinks;
-  spConfig.inputMeasurements = digiCfg.outputMeasurements;
-  spConfig.trackingGeometry = trackingGeometry;
-  spConfig.outputSpacePoints = "spacepoints";
-  spConfig.geometrySelection = {Acts::GeometryIdentifier{}};
+  ActsExamples::SpacePointMaker::Config spCfg;
+  spCfg.inputSourceLinks = digiCfg.outputSourceLinks;
+  spCfg.inputMeasurements = digiCfg.outputMeasurements;
+  spCfg.trackingGeometry = trackingGeometry;
+  spCfg.outputSpacePoints = "spacepoints";
+  spCfg.geometrySelection = {Acts::GeometryIdentifier{}};
 
   // ActsExamples::TruthSeedingAlgorithm::Config truthSeedingCfg;
-  // truthSeedingCfg.inputParticles = evgenConfig.outputParticles;
-  // truthSeedingCfg.inputSpacePoints = {spConfig.outputSpacePoints};
+  // truthSeedingCfg.inputParticles = evgenCfg.outputParticles;
+  // truthSeedingCfg.inputSpacePoints = {spCfg.outputSpacePoints};
   // truthSeedingCfg.inputMeasurementParticlesMap = digiCfg.outputMeasurementParticlesMap;
-  // truthSeedingCfg.outputSeeds = "seeds";
+  // truthSeedingCfg.outputSeeds = seeds;
   // truthSeedingCfg.outputParticles = "seeded_particles";
   // truthSeedingCfg.outputProtoTracks = "prototracks";
   // truthSeedingCfg.deltaRMin = 1._mm;
@@ -138,8 +142,8 @@ int main(){
 
   // Seeding
   ActsExamples::SeedingAlgorithm::Config seedingCfg;
-  seedingCfg.inputSpacePoints = {spConfig.outputSpacePoints};
-  seedingCfg.outputSeeds = "seeds";
+  seedingCfg.inputSpacePoints = {spCfg.outputSpacePoints};
+  seedingCfg.outputSeeds = seeds;
   seedingCfg.gridOptions.bFieldInZ = bz;
   seedingCfg.gridConfig.minPt = 0.1_GeV;
   seedingCfg.gridConfig.zMin = positions[0] - 1_mm;
@@ -166,10 +170,10 @@ int main(){
 
   // Parameter Estimation from seeds
   ActsExamples::TrackParamsEstimationAlgorithm::Config paramsEstimationCfg;
-  paramsEstimationCfg.inputSeeds = seedingCfg.outputSeeds;
+  paramsEstimationCfg.inputSeeds = seeds;
   paramsEstimationCfg.outputTrackParameters = "estimatedparameters";
   paramsEstimationCfg.trackingGeometry = trackingGeometry;
-  paramsEstimationCfg.magneticField = fatrasConfig.magneticField;
+  paramsEstimationCfg.magneticField = fatrasCfg.magneticField;
 
   // Track finding
   ActsExamples::TrackFindingAlgorithm::Config trackFindingCfg;
@@ -178,10 +182,10 @@ int main(){
   trackFindingCfg.inputInitialTrackParameters = paramsEstimationCfg.outputTrackParameters;
   trackFindingCfg.outputTracks = tracks;
   trackFindingCfg.trackingGeometry = trackingGeometry;
-  trackFindingCfg.magneticField = fatrasConfig.magneticField;
+  trackFindingCfg.magneticField = fatrasCfg.magneticField;
   trackFindingCfg.measurementSelectorCfg = {{Acts::GeometryIdentifier(), {{}, {std::numeric_limits<double>::max()}, {1u}}}}; // chi2cut, numberOfMeasurementsPerSurface
   trackFindingCfg.findTracks = ActsExamples::TrackFindingAlgorithm::makeTrackFinderFunction(
-      trackingGeometry, fatrasConfig.magneticField, *Acts::getDefaultLogger("TrackFinder", logLevelFinder));
+      trackingGeometry, fatrasCfg.magneticField, *Acts::getDefaultLogger("TrackFinder", logLevelFinder));
 
   // Track truth matcher
   ActsExamples::TrackTruthMatcher::Config trackTruthMatcherCfg;
@@ -198,13 +202,13 @@ int main(){
   particleWriterCfg.filePath = "particles.root";
 
   // SimhitWriter config
-  ActsExamples::RootSimHitWriter::Config simhitWriterConfig;
-  simhitWriterConfig.inputSimHits = simhits;
-  simhitWriterConfig.filePath = "hits.root";
+  ActsExamples::RootSimHitWriter::Config simhitWriterCfg;
+  simhitWriterCfg.inputSimHits = simhits;
+  simhitWriterCfg.filePath = "hits.root";
 
-  ActsExamples::RootSimHitReader::Config simhitReaderConfig;
-  simhitReaderConfig.outputSimHits = simhits;
-  simhitReaderConfig.filePath = "hits.root";
+  ActsExamples::RootSimHitReader::Config simhitReaderCfg;
+  simhitReaderCfg.outputSimHits = simhits;
+  simhitReaderCfg.filePath = "hits.root";
 
   // Measurement writer
   ActsExamples::CsvMeasurementWriter::Config measWriterCfg;
@@ -213,18 +217,18 @@ int main(){
   measWriterCfg.outputDir = "measurements";
 
   // SpacepointWriter config
-  ActsExamples::RootSpacepointWriter::Config spWriterConfig;
-  spWriterConfig.inputSpacepoints = spConfig.outputSpacePoints;
-  spWriterConfig.filePath = "spacepoints.root";
+  ActsExamples::RootSpacepointWriter::Config spWriterCfg;
+  spWriterCfg.inputSpacepoints = spCfg.outputSpacePoints;
+  spWriterCfg.filePath = "spacepoints.root";
 
   // Seed writer config
-  ActsExamples::CsvSeedWriter::Config seedWriterConfig;
-  seedWriterConfig.inputSimHits = simhits;
-  seedWriterConfig.inputSimSeeds = seedingCfg.outputSeeds;
-  seedWriterConfig.inputTrackParameters = paramsEstimationCfg.outputTrackParameters;
-  seedWriterConfig.inputMeasurementParticlesMap = digiCfg.outputMeasurementParticlesMap;
-  seedWriterConfig.inputMeasurementSimHitsMap = digiCfg.outputMeasurementSimHitsMap;
-  seedWriterConfig.outputDir = "seeds";
+  ActsExamples::CsvSeedWriter::Config seedWriterCfg;
+  seedWriterCfg.inputSimHits = simhits;
+  seedWriterCfg.inputSimSeeds = seeds;
+  seedWriterCfg.inputTrackParameters = paramsEstimationCfg.outputTrackParameters;
+  seedWriterCfg.inputMeasurementParticlesMap = digiCfg.outputMeasurementParticlesMap;
+  seedWriterCfg.inputMeasurementSimHitsMap = digiCfg.outputMeasurementSimHitsMap;
+  seedWriterCfg.outputDir = "seeds";
 
   // write track states from CKF
   ActsExamples::RootTrackStatesWriter::Config trackStatesWriterCfg;
@@ -242,32 +246,32 @@ int main(){
   trackSummaryWriterCfg.inputTrackParticleMatching = trackTruthMatcherCfg.outputTrackParticleMatching;
 
   // Sequencer config
-  ActsExamples::Sequencer::Config sequencerConfig;
-  sequencerConfig.numThreads = 1;
-  sequencerConfig.events = 100000;
-  sequencerConfig.logLevel = logLevelSequencer;
+  ActsExamples::Sequencer::Config sequencerCfg;
+  sequencerCfg.numThreads = 1;
+  sequencerCfg.events = nEvents;
+  sequencerCfg.logLevel = logLevelSequencer;
 
   // Start sequencer
-  ActsExamples::Sequencer sequencer(sequencerConfig);
+  ActsExamples::Sequencer sequencer(sequencerCfg);
   
-  sequencer.addReader(std::make_shared<ActsExamples::EventGenerator>(evgenConfig, logLevel));
+  sequencer.addReader(std::make_shared<ActsExamples::EventGenerator>(evgenCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootParticleWriter>(particleWriterCfg, logLevel));
 //  sequencer.addReader(std::make_shared<ActsExamples::RootParticleReader>(particleReaderCfg, logLevel));
   
-  sequencer.addElement(std::make_shared<ActsExamples::FatrasSimulation>(fatrasConfig, logLevelFatras));
-  sequencer.addWriter(std::make_shared<ActsExamples::RootSimHitWriter>(simhitWriterConfig, logLevel));
-//  sequencer.addReader(std::make_shared<ActsExamples::RootSimHitReader>(simhitReaderConfig, logLevel));
+  sequencer.addElement(std::make_shared<ActsExamples::FatrasSimulation>(fatrasCfg, logLevelFatras));
+  sequencer.addWriter(std::make_shared<ActsExamples::RootSimHitWriter>(simhitWriterCfg, logLevel));
+//  sequencer.addReader(std::make_shared<ActsExamples::RootSimHitReader>(simhitReaderCfg, logLevel));
 
   sequencer.addAlgorithm(std::make_shared<ActsExamples::DigitizationAlgorithm>(digiCfg, logLevelDigi));
   sequencer.addWriter(std::make_shared<ActsExamples::CsvMeasurementWriter>(measWriterCfg, logLevel));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::SpacePointMaker>(spConfig, logLevel));
-  sequencer.addWriter(std::make_shared<ActsExamples::RootSpacepointWriter>(spWriterConfig, logLevel));
+  sequencer.addAlgorithm(std::make_shared<ActsExamples::SpacePointMaker>(spCfg, logLevel));
+  sequencer.addWriter(std::make_shared<ActsExamples::RootSpacepointWriter>(spWriterCfg, logLevel));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::SeedingAlgorithm>(seedingCfg, logLevelSeed));
 
   // sequencer.addAlgorithm(std::make_shared<ActsExamples::TruthSeedingAlgorithm>(truthSeedingCfg, logLevelSeed));
 
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackParamsEstimationAlgorithm>(paramsEstimationCfg, logLevel));
-  sequencer.addWriter(std::make_shared<ActsExamples::CsvSeedWriter>(seedWriterConfig, logLevel));
+  sequencer.addWriter(std::make_shared<ActsExamples::CsvSeedWriter>(seedWriterCfg, logLevel));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackFindingAlgorithm>(trackFindingCfg, logLevelFinder));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackTruthMatcher>(trackTruthMatcherCfg, logLevelMatcher));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackStatesWriter>(trackStatesWriterCfg, logLevel));

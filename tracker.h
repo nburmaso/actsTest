@@ -22,10 +22,8 @@ private:
 std::vector<std::shared_ptr<MyDetectorElement>> detectorStore;
 Acts::GeometryContext gctx;
 
-Acts::TrackingGeometry* CreateTrackingGeometry(){
+Acts::TrackingGeometry* CreateTrackingGeometry(bool addROC = 0, bool addFlange = 0){
   // Create materials
-  double radLenSilicon = 9.370_cm;
-  double radLenAluminium = 8.897_cm;
   Acts::Material silicon   = Acts::Material::fromMassDensity(9.370_cm, 46.52_cm, 28.0855, 14, 2.329_g / 1_cm3);
   Acts::Material aluminium = Acts::Material::fromMassDensity(8.897_cm, 39.70_cm, 26.9815, 13, 2.699_g / 1_cm3);
 
@@ -35,7 +33,7 @@ Acts::TrackingGeometry* CreateTrackingGeometry(){
   // Construct the surfaces and layers
   Acts::LayerVector layVec;
 
-  if (1) {
+  if (addROC) {
     double eps = 1e-10;
     double radLenFractionROC = 0.25;
     double thicknessROC = radLenFractionROC*radLenAluminium;
@@ -84,7 +82,7 @@ Acts::TrackingGeometry* CreateTrackingGeometry(){
     detectorStore.push_back(std::move(detElement));
     }
     
-    if (1) {
+    if (addFlange) {
     Acts::MaterialSlab matPropFrame(aluminium, thicknessFrame);
     const auto surfaceMatFrame = std::make_shared<Acts::HomogeneousSurfaceMaterial>(matPropFrame);
     std::vector<std::shared_ptr<const Acts::Surface>> vSurfaceFrame;
