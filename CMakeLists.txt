@@ -19,8 +19,9 @@ find_package(Eigen3 REQUIRED HINTS "${SW}/Eigen3/latest")
 find_package(Acts REQUIRED)
 
 include_directories(
+        $ENV{PWD}
         ${SW}/TBB/latest/include
-        ${SW}/nlohmann_json/latest/include/
+        ${SW}/nlohmann_json/latest/include
 )
 link_directories(
         ${SW}/TBB/latest/lib
@@ -28,7 +29,7 @@ link_directories(
         )
 
 # main exec
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} main.cpp tracker.h tracker_config.h)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
         ActsCore
