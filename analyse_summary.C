@@ -199,28 +199,6 @@ void analyse_summary(){
     }
   }
 
-  new TCanvas;
-  h_eLOC0_fit->Draw();
-
-  new TCanvas;
-  h_eLOC1_fit->Draw();
-
-  new TCanvas;
-  h_pull_eQOP_fit->Draw();
-
-  new TCanvas;
-  h_pull_eLOC0_fit->Draw();
-
-  new TCanvas;
-  h_pull_eLOC1_fit->Draw();
-
-  gStyle->SetOptFit(1);
-
-  new TCanvas;
-  SetHisto(h_eQOP_fit,";q/p (1/GeV)");
-  SetPad(gPad);
-  h_eQOP_fit->Draw();
-
   TCanvas* cPulls = new TCanvas("cPulls","",1900,800);
   cPulls->Divide(3,2,0.001,0.001);
   cPulls->cd(1);

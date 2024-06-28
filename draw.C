@@ -12,7 +12,7 @@
 using namespace std;
 
 void draw(){
-  TFile* f = new TFile("hits.root");
+  TFile* f = new TFile("build/hits.root");
   TTree* t = (TTree*) f->Get("hits");
   float tz = 0;
   float tx = 0;
@@ -67,7 +67,7 @@ void draw(){
   }
 
 
-  ifstream fmeasurements(Form("measurements/event%09d-measurements.csv",selectedEvent));
+  ifstream fmeasurements(Form("build/measurements/event%09d-measurements.csv",selectedEvent));
   vector<double> xMes;
   vector<double> yMes;
   vector<double> xErr;
@@ -94,7 +94,7 @@ void draw(){
   gMes->SetMarkerSize(0.1);
   gMes->Draw("p");
 
-  ifstream fseeds(Form("seeds/event%09d-Seed.csv",selectedEvent));
+  ifstream fseeds(Form("build/seeds/event%09d-Seed.csv",selectedEvent));
   for( std::string line; getline(fseeds, line); ){
     TObjArray* objArray = TString(line).Tokenize(",");
     if (TString(objArray->At(0)->GetName()).Contains("seed_id")) continue;
