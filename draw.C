@@ -13,9 +13,7 @@ using namespace std;
 
 void draw(){
   TFile* f = new TFile("hits.root");
-  f->ls();
   TTree* t = (TTree*) f->Get("hits");
-  t->Print();
   float tz = 0;
   float tx = 0;
   float ty = 0;
@@ -33,14 +31,15 @@ void draw(){
   int n=0;
   printf("%lld\n",t->GetEntries());
 
-  int selectedEvent = 4;
+  int selectedEvent = 55;
 
   std::map<ULong64_t,TGraph*> mapGraphHitsXY;
   for (int entry=0;entry<t->GetEntries();entry++){
     t->GetEntry(entry);
+    //printf("%d",event_id);
     if (event_id!=selectedEvent) continue;
     hZ->Fill(tz);
-    printf("%llu\n",particle_id);
+    //printf("%llu\n",particle_id);
     if (auto graph = mapGraphHitsXY.find(particle_id); graph == mapGraphHitsXY.end()) mapGraphHitsXY[particle_id] = new TGraph();
     mapGraphHitsXY[particle_id]->AddPoint(tx,ty);
   }

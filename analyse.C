@@ -12,20 +12,27 @@
 using namespace std;
 
 void analyse(){
-  TFile* f = new TFile("trackstates_ckf.root");
-  f->ls();
-  vector<float> t_x;     vector<float>* ptr_t_x = &t_x;
+  TFile* f = new TFile("hits.root");
+  float tx;
+  float ty;
+  float tz;
 
   UInt_t track_nr;
-  TTree* t = (TTree*) f->Get("trackstates");
-  t->Print();
-  t->SetBranchAddress("t_x",&ptr_t_x);
-  t->SetBranchAddress("track_nr",&track_nr);
-  for (int itr = 0;itr<t->GetEntries();itr++){
-    t->GetEntry(itr);
-    printf("%d\n",track_nr);
-    for (UInt_t i=0;i<t_x.size();i++){
-      printf("  %f\n",t_x[i]);
+  TTree* t = (TTree*) f->Get("hits");
+  t->SetBranchAddress("tx",&tx);
+  t->SetBranchAddress("ty",&ty);
+  t->SetBranchAddress("tz",&tz);
+
+  TH2D* hXY = new TH2D("hXY","",1000,-1500,1500,1000,-1500,1500);
+  for (int i = 0;i<t->GetEntries();i++){
+    t->GetEntry(i);
+    // if (tz>2000 && tz<2150){
+    //if (tz>1500 && tz<1660){
+    if (tz>1660 && tz<1720){
+      hXY->Fill(tx,ty);
     }
   }
+
+  new TCanvas;
+  hXY->Draw("colz");
 }

@@ -52,6 +52,7 @@ set(SCRIPTS
         digi-smearing-config.json
         draw.C
         analyse.C
+        analyse_summary.C
         read_particles.C
         convert_urqmd_to_acts_format.C
         )
