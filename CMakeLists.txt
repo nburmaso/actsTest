@@ -22,10 +22,12 @@ include_directories(
         $ENV{PWD}
         ${SW}/TBB/latest/include
         ${SW}/nlohmann_json/latest/include
+        ${SW}/ROOT/latest/include
 )
 link_directories(
         ${SW}/TBB/latest/lib
         ${SW}/ACTS/latest/lib
+        ${SW}/ROOT/latest/lib
         )
 
 # main exec
@@ -46,16 +48,13 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
         ActsExamplesTrackFinding
         ActsExamplesTruthTracking
         tbb
+        Core
+        Tree
 )
 
 # copy run macros
 set(SCRIPTS
         digi-smearing-config.json
-        draw.C
-        analyse.C
-        analyse_summary.C
-        read_particles.C
-        convert_urqmd_to_acts_format.C
         )
 
 foreach (_script ${SCRIPTS})
