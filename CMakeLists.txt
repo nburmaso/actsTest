@@ -46,6 +46,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
         ActsExamplesIoRoot
         ActsExamplesIoCsv
         ActsExamplesTrackFinding
+        ActsExamplesTrackFitting
         ActsExamplesTruthTracking
         tbb
         Core

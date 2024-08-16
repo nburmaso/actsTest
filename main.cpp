@@ -53,6 +53,8 @@
 
 #include <filesystem>
 
+#include "MyRefittingAlgorithm.hpp"
+
 using Acts::UnitConstants::cm;
 
 int main(int argc, char *argv[]){
@@ -60,7 +62,7 @@ int main(int argc, char *argv[]){
   TString inputDir = "none";
   TString outputDir = "test";
   int nEvents = 10;
-  Acts::PdgParticle pdgCode = Acts::ePionPlus;
+  Acts::PdgParticle pdgCode = Acts::eProton;
   double etaMin = 1.6;
   double vzMax = 50;
   double radLengthPerSeed = 0.01;
@@ -105,7 +107,7 @@ int main(int argc, char *argv[]){
   Acts::Logging::Level logLevelSequencer = Acts::Logging::ERROR;
   Acts::Logging::Level logLevelMatcher = Acts::Logging::INFO;
   Acts::Logging::Level logLevelMeasWriter = Acts::Logging::INFO;
-
+  Acts::Logging::Level logLevelMyRefit = Acts::Logging::VERBOSE;
   // collection names
   std::string particles = "particles";
   std::string vertices = "vertices";
@@ -314,6 +316,24 @@ int main(int argc, char *argv[]){
   trackSummaryWriterCfg.inputTrackParticleMatching = trackTruthMatcherCfg.outputTrackParticleMatching;
   trackSummaryWriterCfg.filePath = TString(outputDir+"tracksummary.root").Data();
 
+  ActsExamples::MyRefittingAlgorithm::Config refitCfg;
+  refitCfg.inputTracks = tracks;
+  refitCfg.outputTracks = "refitted_tracks";
+  refitCfg.trackingGeometry = trackingGeometry;
+  refitCfg.magneticField = fatrasCfg.magneticField;
+  //refitCfg.fit = ActsExamples::makeKalmanFitterFunction(trackingGeometry, fatrasCfg.magneticField);
+
+  refitCfg.fit = ActsExamples::makeKalmanFitterFunction(trackingGeometry, fatrasCfg.magneticField, true, true, 0.0, Acts::FreeToBoundCorrection(), *Acts::getDefaultLogger("Kalman", logLevelMyRefit));
+
+  // Acts::FreeToBoundCorrection
+  // refitCfg.fit = ActsExamples::makeGsfFitterFunction(trackingGeometry, fatrasCfg.magneticField);
+  //   /*BetheHeitlerApprox betheHeitlerApprox*/ , // acts.examples.AtlasBetheHeitlerApprox.makeDefault(),
+  //   /*std::size_t maxComponents*/ 4,
+  //   /*double weightCutoff*/ 1.0e-4, 
+  //   /*Acts::ComponentMergeMethod componentMergeMethod*/,
+  //   /*MixtureReductionAlgorithm mixtureReductionAlgorithm*/,
+  //   /*const Acts::Logger& logger*/
+  
   // Sequencer config
   ActsExamples::Sequencer::Config sequencerCfg;
   sequencerCfg.numThreads = 1;
@@ -335,7 +355,11 @@ int main(int argc, char *argv[]){
   sequencer.addAlgorithm(std::make_shared<ActsExamples::SeedingAlgorithm>(seedingCfg, logLevelSeed));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackParamsEstimationAlgorithm>(paramsEstimationCfg, logLevel));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackFindingAlgorithm>(trackFindingCfg, logLevelFinder));
+  sequencer.addAlgorithm(std::make_shared<ActsExamples::MyRefittingAlgorithm>(refitCfg, logLevelMyRefit));
+
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackTruthMatcher>(trackTruthMatcherCfg, logLevelMatcher));
+
+
   sequencer.addWriter(std::make_shared<ActsExamples::RootParticleWriter>(particleWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootSimHitWriter>(simhitWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootMeasurementWriter>(measWriterCfg, logLevelMeasWriter));
