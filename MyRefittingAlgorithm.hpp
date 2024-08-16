@@ -1,11 +1,3 @@
-// This file is part of the Acts project.
-//
-// Copyright (C) 2019-2021 CERN for the benefit of the Acts project
-//
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
 #pragma once
 
 #include "Acts/Utilities/Logger.hpp"
@@ -51,14 +43,6 @@ class MyRefittingAlgorithm final : public IAlgorithm {
     std::shared_ptr<const Acts::MagneticFieldProvider> magneticField;
   };
 
-  // struct SimpleReverseFilteringLogic {
-  //   double momentumThreshold = 0;
-  //   bool doBackwardFiltering(Acts::VectorMultiTrajectory::ConstTrackStateProxy trackState) const {
-  //     auto momentum = fabs(1 / trackState.filtered()[Acts::eBoundQOverP]);
-  //     return (momentum <= momentumThreshold);
-  //   }
-  // };
-
   MyRefittingAlgorithm(Config config, Acts::Logging::Level level):ActsExamples::IAlgorithm("TrackFittingAlgorithm", level), m_cfg(std::move(config)) {
     m_inputTracks.initialize(m_cfg.inputTracks);
     m_outputTracks.initialize(m_cfg.outputTracks);
@@ -76,13 +60,6 @@ class MyRefittingAlgorithm final : public IAlgorithm {
     Acts::KalmanFitterExtensions<Acts::VectorMultiTrajectory> extensions;
     extensions.surfaceAccessor.connect<&IndexSourceLink::SurfaceAccessor::operator()>(&slSurfaceAccessor);
     extensions.calibrator.connect<&MyCalibrator::calibrate>(&calibrator);
-
-    // Acts::GainMatrixUpdater kfUpdater;
-    // Acts::GainMatrixSmoother kfSmoother;
-    // SimpleReverseFilteringLogic reverseFilteringLogic;
-    //extensions.updater.connect<&Acts::GainMatrixUpdater::operator()<Acts::VectorMultiTrajectory>>(&kfUpdater);
-    // extensions.smoother.connect<&Acts::GainMatrixSmoother::operator()<Acts::VectorMultiTrajectory>>(&kfSmoother);
-    //extensions.reverseFilteringLogic.connect<&SimpleReverseFilteringLogic::doBackwardFiltering>(&reverseFilteringLogic);
 
     Acts::KalmanFitterOptions<Acts::VectorMultiTrajectory> kfOptions(ctx.geoContext, ctx.magFieldContext, ctx.calibContext, extensions, Acts::PropagatorPlainOptions());
     

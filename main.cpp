@@ -316,23 +316,12 @@ int main(int argc, char *argv[]){
   trackSummaryWriterCfg.inputTrackParticleMatching = trackTruthMatcherCfg.outputTrackParticleMatching;
   trackSummaryWriterCfg.filePath = TString(outputDir+"tracksummary.root").Data();
 
+  // Refitting algorithm config
   ActsExamples::MyRefittingAlgorithm::Config refitCfg;
   refitCfg.inputTracks = tracks;
   refitCfg.outputTracks = "refitted_tracks";
   refitCfg.trackingGeometry = trackingGeometry;
   refitCfg.magneticField = fatrasCfg.magneticField;
-  //refitCfg.fit = ActsExamples::makeKalmanFitterFunction(trackingGeometry, fatrasCfg.magneticField);
-
-  refitCfg.fit = ActsExamples::makeKalmanFitterFunction(trackingGeometry, fatrasCfg.magneticField, true, true, 0.0, Acts::FreeToBoundCorrection(), *Acts::getDefaultLogger("Kalman", logLevelMyRefit));
-
-  // Acts::FreeToBoundCorrection
-  // refitCfg.fit = ActsExamples::makeGsfFitterFunction(trackingGeometry, fatrasCfg.magneticField);
-  //   /*BetheHeitlerApprox betheHeitlerApprox*/ , // acts.examples.AtlasBetheHeitlerApprox.makeDefault(),
-  //   /*std::size_t maxComponents*/ 4,
-  //   /*double weightCutoff*/ 1.0e-4, 
-  //   /*Acts::ComponentMergeMethod componentMergeMethod*/,
-  //   /*MixtureReductionAlgorithm mixtureReductionAlgorithm*/,
-  //   /*const Acts::Logger& logger*/
   
   // Sequencer config
   ActsExamples::Sequencer::Config sequencerCfg;
