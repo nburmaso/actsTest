@@ -60,18 +60,21 @@ using Acts::UnitConstants::cm;
 int main(int argc, char *argv[]){
   // default parameters
   TString inputDir = "none";
-  TString outputDir = "test";
-  int nEvents = 10;
-  Acts::PdgParticle pdgCode = Acts::eProton;
-  double etaMin = 1.6;
+  TString outputDir = "notpc";
+  int nEvents = 100000;
+  //Acts::PdgParticle pdgCode = Acts::eProton;
+  Acts::PdgParticle pdgCode = Acts::ePionPlus;
+  double etaMin = 2.2;
   double vzMax = 50;
   double radLengthPerSeed = 0.01;
 
-  // double ptMin = 0.100_GeV;
+  // double ptMin = 0.950_GeV;
   // double ptMax = 1.000_GeV+1.e-100_GeV;
+  double ptMin = 0.100_GeV;
+  double ptMax = 1.000_GeV +1e-100_GeV;
 
-  double ptMin = 0.350_GeV;
-  double ptMax = 0.350_GeV +1e-100_GeV;
+  // double ptMin = 0.350_GeV;
+  // double ptMax = 0.350_GeV +1e-100_GeV;
   // non-default setup
   if (argc>=4) {
     inputDir = argv[1];
@@ -107,7 +110,7 @@ int main(int argc, char *argv[]){
   Acts::Logging::Level logLevelSequencer = Acts::Logging::ERROR;
   Acts::Logging::Level logLevelMatcher = Acts::Logging::INFO;
   Acts::Logging::Level logLevelMeasWriter = Acts::Logging::INFO;
-  Acts::Logging::Level logLevelMyRefit = Acts::Logging::VERBOSE;
+  Acts::Logging::Level logLevelMyRefit = Acts::Logging::ERROR;
   // collection names
   std::string particles = "particles";
   std::string vertices = "vertices";
@@ -169,7 +172,15 @@ int main(int argc, char *argv[]){
   digiCfg.randomNumbers = rnd;
   digiCfg.outputMeasurements = measurements;
   digiCfg.trackingGeometry = trackingGeometry;
-  digiCfg.digitizationConfigs = ActsExamples::readDigiConfigFromJson("digi-smearing-config.json");
+//  digiCfg.digitizationConfigs = ActsExamples::readDigiConfigFromJson("digi-smearing-config.json");
+  
+  Acts::GeometryIdentifier id;
+  id.setVolume(1);
+  ActsExamples::DigiComponentsConfig digiConfig;
+  digiConfig.smearingDigiConfig.push_back(ActsExamples::ParameterSmearingConfig{Acts::eBoundLoc0, ActsExamples::Digitization::Gauss(0.08)});
+  digiConfig.smearingDigiConfig.push_back(ActsExamples::ParameterSmearingConfig{Acts::eBoundLoc1, ActsExamples::Digitization::Gauss(0.08)});
+  std::vector<std::pair<Acts::GeometryIdentifier, ActsExamples::DigiComponentsConfig>> elements = { {id, digiConfig} };
+  digiCfg.digitizationConfigs = Acts::GeometryHierarchyMap<ActsExamples::DigiComponentsConfig>(elements);
 
   // Create space points
   ActsExamples::SpacePointMaker::Config spCfg;
@@ -281,25 +292,6 @@ int main(int argc, char *argv[]){
   seedWriterCfg.inputSeeds = seeds;
   seedWriterCfg.filePath = TString(outputDir+"seeds.root").Data();
 
-/*
-  // Measurement writer
-  ActsExamples::CsvMeasurementWriter::Config measCsvWriterCfg;
-  measCsvWriterCfg.inputMeasurements = digiCfg.outputMeasurements;
-  measCsvWriterCfg.inputMeasurementSimHitsMap = digiCfg.outputMeasurementSimHitsMap;
-  measCsvWriterCfg.outputDir = "measurements";
-*/
-
-/*
-  // Seed csv writer config
-  ActsExamples::CsvSeedWriter::Config seedCsvWriterCfg;
-  seedCsvWriterCfg.inputSimHits = simhits;
-  seedCsvWriterCfg.inputSimSeeds = seeds;
-  seedCsvWriterCfg.inputTrackParameters = paramsEstimationCfg.outputTrackParameters;
-  seedCsvWriterCfg.inputMeasurementParticlesMap = digiCfg.outputMeasurementParticlesMap;
-  seedCsvWriterCfg.inputMeasurementSimHitsMap = digiCfg.outputMeasurementSimHitsMap;
-  seedCsvWriterCfg.outputDir = "seeds";
-*/
-
   // write track states from CKF
   ActsExamples::RootTrackStatesWriter::Config trackStatesWriterCfg;
   trackStatesWriterCfg.inputTracks = tracks;
@@ -319,10 +311,18 @@ int main(int argc, char *argv[]){
   // Refitting algorithm config
   ActsExamples::MyRefittingAlgorithm::Config refitCfg;
   refitCfg.inputTracks = tracks;
+  refitCfg.inputMeasurements = measurements;
   refitCfg.outputTracks = "refitted_tracks";
   refitCfg.trackingGeometry = trackingGeometry;
   refitCfg.magneticField = fatrasCfg.magneticField;
-  
+
+  ActsExamples::RootTrackSummaryWriter::Config trackRefitSummaryWriterCfg;
+  trackRefitSummaryWriterCfg.inputTracks = refitCfg.outputTracks;
+  trackRefitSummaryWriterCfg.inputParticles = particles;
+  trackRefitSummaryWriterCfg.inputTrackParticleMatching = trackTruthMatcherCfg.outputTrackParticleMatching;
+  trackRefitSummaryWriterCfg.filePath = TString(outputDir+"trackrefit.root").Data();
+
+
   // Sequencer config
   ActsExamples::Sequencer::Config sequencerCfg;
   sequencerCfg.numThreads = 1;
@@ -356,11 +356,7 @@ int main(int argc, char *argv[]){
   sequencer.addWriter(std::make_shared<ActsExamples::RootSeedWriter>(seedWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackStatesWriter>(trackStatesWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackSummaryWriter>(trackSummaryWriterCfg, logLevel));
-
-  //  obsolete
-  //  sequencer.addAlgorithm(std::make_shared<ActsExamples::TruthSeedingAlgorithm>(truthSeedingCfg, logLevelSeed));
-  //  sequencer.addWriter(std::make_shared<ActsExamples::CsvMeasurementWriter>(measCsvWriterCfg, logLevel));
-  //  sequencer.addWriter(std::make_shared<ActsExamples::CsvSeedWriter>(seedCsvWriterCfg, logLevel));
+  sequencer.addWriter(std::make_shared<ActsExamples::RootTrackSummaryWriter>(trackRefitSummaryWriterCfg, logLevel));
 
   sequencer.run();
 

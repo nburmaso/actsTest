@@ -55,7 +55,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
 
 # copy run macros
 set(SCRIPTS
-        digi-smearing-config.json
         )
 
 foreach (_script ${SCRIPTS})
