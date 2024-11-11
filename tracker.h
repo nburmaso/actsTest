@@ -1,7 +1,16 @@
-#ifndef tracker
-#define tracker
+#pragma once
+
 #include "tracker_config.h"
 #include "Acts/Definitions/Units.hpp"
+#include "Acts/Geometry/CuboidVolumeBounds.hpp"
+#include "Acts/Geometry/TrackingVolume.hpp"
+#include "Acts/Surfaces/PlanarBounds.hpp"
+#include "Acts/Surfaces/RectangleBounds.hpp"
+#include "Acts/Material/HomogeneousVolumeMaterial.hpp"
+#include "Acts/Plugins/Geant4/Geant4Converters.hpp"
+
+#include "Geant4/G4Material.hh"
+#include "Geant4/G4NistManager.hh"
 
 using Acts::UnitConstants::cm;
 
@@ -27,15 +36,22 @@ Acts::GeometryContext gctx;
 
 Acts::TrackingGeometry* CreateTrackingGeometry(bool addROC = 1, bool addFlange = 1){
   // Create materials
-  Acts::Material silicon   = Acts::Material::fromMassDensity(9.370_cm, 46.52_cm, 28.0855, 14, 2.329_g / 1_cm3);
-  Acts::Material aluminium = Acts::Material::fromMassDensity(8.897_cm, 39.70_cm, 26.9815, 13, 2.699_g / 1_cm3);
+  auto* nist = G4NistManager::Instance();
+  G4Material* siMat = nist->FindOrBuildMaterial("G4_Si");
+  G4Material* alMat = nist->FindOrBuildMaterial("G4_Al");
+  G4Material* worldMat = nist->FindOrBuildMaterial("G4_Galactic");
+
+  Acts::Geant4MaterialConverter converter;
+  Acts::Material silicon = converter.material(*siMat);
+  Acts::Material aluminium = converter.material(*alMat);
+  Acts::Material vacuum = converter.material(*worldMat);
 
   Acts::MaterialSlab matProp(silicon, thickness*cm);
   const auto surfaceMaterial = std::make_shared<Acts::HomogeneousSurfaceMaterial>(matProp);
+  const auto volumeMaterial = std::make_shared<Acts::HomogeneousVolumeMaterial>(vacuum);
 
   // Construct the surfaces and layers
   Acts::LayerVector layVec;
- 
 
   if (addROC) {
     double phi[nSectors];
@@ -100,7 +116,6 @@ Acts::TrackingGeometry* CreateTrackingGeometry(bool addROC = 1, bool addFlange =
     }
   }
 
-
   // const auto rBounds = std::make_shared<const Acts::RadialBounds>(rMinStation, rMaxStation);  // <- for disk-like layers
   const auto pBounds = std::make_shared<const Acts::RectangleBounds>(rMaxStation*cm, rMaxStation*cm); // <- for square-like layers
   for (unsigned int i = 0; i < positions.size(); i++) {
@@ -130,39 +145,37 @@ Acts::TrackingGeometry* CreateTrackingGeometry(bool addROC = 1, bool addFlange =
   // Build mother tracking volume
   Acts::Translation3 transVol(0, 0, 0);
   Acts::Transform3 trafoVol(transVol);
-  auto boundsVol = std::make_shared<const Acts::CuboidVolumeBounds>(2000._mm, 2000._mm, 3100._mm); // <- for square-like layers
-  auto trackVolume = std::make_shared<Acts::TrackingVolume>(trafoVol, boundsVol, nullptr, std::move(layArr), nullptr, Acts::MutableTrackingVolumeVector{}, "Telescope");
+  auto boundsVol = std::make_shared<Acts::CuboidVolumeBounds>(2000._mm, 2000._mm, 3100._mm); // <- for square-like layers
+  auto trackVolume = std::make_shared<Acts::TrackingVolume>(trafoVol, boundsVol, volumeMaterial, std::move(layArr), nullptr, Acts::MutableTrackingVolumeVector{}, "Telescope");
   // Build tracking geometry
   auto trackingGeometry = new Acts::TrackingGeometry(trackVolume);
 
   // Check geometry
-  // Why geometryIds are not set?
-  bool print_surface_info = 0;
+  bool print_surface_info = false;
   if (print_surface_info) {
     const Acts::TrackingVolume *highestTrackingVolume = trackingGeometry->highestTrackingVolume();
     printf("volumeId = %d\n", highestTrackingVolume->geometryId().value());
     const Acts::LayerArray *confinedLayers = highestTrackingVolume->confinedLayers();
     for (const auto &layer : confinedLayers->arrayObjects())  {
-      printf("  layerId = %d, thickness = %f type = %d\n", layer->geometryId().value(), layer->thickness(), layer->layerType());
-      if (layer->layerType()==-1) {
-        const Acts::NavigationLayer* nlayer = dynamic_cast<const Acts::NavigationLayer*>(layer.get());
-        printf(" navigation %p\n", nlayer);
-      } else if (layer->layerType()==0) {
-        const Acts::DiscLayer* player = dynamic_cast<const Acts::DiscLayer*>(layer.get());
-        printf(" disk %p\n", player);
-      } else {
-        const Acts::PlaneLayer* player = dynamic_cast<const Acts::PlaneLayer*>(layer.get());
-        printf(" plane %p\n", player);
-      }
+      printf("  layerId = %lu, thickness = %f type = %d\n", layer->geometryId().value(), layer->thickness(), layer->layerType());
+//      if (layer->layerType()==-1) {
+//        const Acts::NavigationLayer* nlayer = dynamic_cast<const Acts::NavigationLayer*>(layer.get());
+//        printf(" navigation %p\n", nlayer);
+//      } else if (layer->layerType()==0) {
+//        const Acts::DiscLayer* player = dynamic_cast<const Acts::DiscLayer*>(layer.get());
+//        printf(" disk %p\n", player);
+//      } else {
+//        const Acts::PlaneLayer* player = dynamic_cast<const Acts::PlaneLayer*>(layer.get());
+//        printf(" plane %p\n", player);
+//      }
       if (!layer->surfaceArray())
         continue;
       for (const auto &surface : layer->surfaceArray()->surfaces())
       {
-        printf("    surfaceId = %d\n", surface->geometryId().value());
+        printf("    surfaceId = %lu\n", surface->geometryId().value());
       }
     } //for layers
   } // print_surface_info
+
   return trackingGeometry;
 }
-
-#endif

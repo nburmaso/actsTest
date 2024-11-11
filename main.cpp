@@ -51,9 +51,11 @@
 #include "tracker_config.h"
 #include "tracker.h"
 
+#include "TString.h"
+
 #include <filesystem>
 
-#include "MyRefittingAlgorithm.hpp"
+ #include "MyRefittingAlgorithm.hpp"
 
 using Acts::UnitConstants::cm;
 
@@ -62,8 +64,8 @@ int main(int argc, char *argv[]){
   TString inputDir = "none";
   TString outputDir = "notpc";
   int nEvents = 100000;
-  //Acts::PdgParticle pdgCode = Acts::eProton;
-  Acts::PdgParticle pdgCode = Acts::ePionPlus;
+  Acts::PdgParticle pdgCode = Acts::eGamma;
+//  Acts::PdgParticle pdgCode = Acts::eAntiMuon;
   double etaMin = 2.2;
   double vzMax = 50;
   double radLengthPerSeed = 0.01;
@@ -81,12 +83,13 @@ int main(int argc, char *argv[]){
     outputDir = argv[2];
     nEvents = TString(argv[3]).Atoi();
   }
-  
+
   if (argc>=6) {
     TString pdg = TString(argv[4]);
     if (pdg.Contains("pi")) pdgCode = Acts::ePionPlus;
     if (pdg.Contains("pr")) pdgCode = Acts::eProton;
     if (pdg.Contains("mu")) pdgCode = Acts::eAntiMuon;
+    if (pdg.Contains("ga")) pdgCode = Acts::eGamma;
     etaMin = TString(argv[5]).Atof();
   }
   if (argc>=7) vzMax = TString(argv[6]).Atof();
@@ -107,7 +110,7 @@ int main(int argc, char *argv[]){
   Acts::Logging::Level logLevelDigi = Acts::Logging::INFO;
   Acts::Logging::Level logLevelSeed = Acts::Logging::INFO;
   Acts::Logging::Level logLevelFinder = Acts::Logging::INFO;
-  Acts::Logging::Level logLevelSequencer = Acts::Logging::ERROR;
+  Acts::Logging::Level logLevelSequencer = Acts::Logging::INFO;
   Acts::Logging::Level logLevelMatcher = Acts::Logging::INFO;
   Acts::Logging::Level logLevelMeasWriter = Acts::Logging::INFO;
   Acts::Logging::Level logLevelMyRefit = Acts::Logging::ERROR;
@@ -171,9 +174,8 @@ int main(int argc, char *argv[]){
   digiCfg.inputSimHits = simhits;
   digiCfg.randomNumbers = rnd;
   digiCfg.outputMeasurements = measurements;
-  digiCfg.trackingGeometry = trackingGeometry;
 //  digiCfg.digitizationConfigs = ActsExamples::readDigiConfigFromJson("digi-smearing-config.json");
-  
+
   Acts::GeometryIdentifier id;
   id.setVolume(1);
   ActsExamples::DigiComponentsConfig digiConfig;
@@ -182,9 +184,11 @@ int main(int argc, char *argv[]){
   std::vector<std::pair<Acts::GeometryIdentifier, ActsExamples::DigiComponentsConfig>> elements = { {id, digiConfig} };
   digiCfg.digitizationConfigs = Acts::GeometryHierarchyMap<ActsExamples::DigiComponentsConfig>(elements);
 
+  digiCfg.surfaceByIdentifier = trackingGeometry->geoIdSurfaceMap();
+
   // Create space points
   ActsExamples::SpacePointMaker::Config spCfg;
-  spCfg.inputSourceLinks = digiCfg.outputSourceLinks;
+//  spCfg.inputSourceLinks = digiCfg.outputSourceLinks;
   spCfg.inputMeasurements = measurements;
   spCfg.trackingGeometry = trackingGeometry;
   spCfg.outputSpacePoints = spacepoints;
@@ -242,7 +246,6 @@ int main(int argc, char *argv[]){
   // Track finding
   ActsExamples::TrackFindingAlgorithm::Config trackFindingCfg;
   trackFindingCfg.inputMeasurements = measurements;
-  trackFindingCfg.inputSourceLinks = digiCfg.outputSourceLinks;
   trackFindingCfg.inputInitialTrackParameters = paramsEstimationCfg.outputTrackParameters;
   trackFindingCfg.outputTracks = tracks;
   trackFindingCfg.trackingGeometry = trackingGeometry;
@@ -280,7 +283,7 @@ int main(int argc, char *argv[]){
   measWriterCfg.inputSimHits = simhits;
   measWriterCfg.inputMeasurementSimHitsMap = digiCfg.outputMeasurementSimHitsMap;
   measWriterCfg.filePath = TString(outputDir+"measurements.root").Data();
-  measWriterCfg.trackingGeometry = trackingGeometry;
+  measWriterCfg.surfaceByIdentifier = trackingGeometry->geoIdSurfaceMap();
   measWriterCfg.boundIndices = Acts::GeometryHierarchyMap<std::vector<Acts::BoundIndices>>(digiCfg.getBoundIndices());
 
   // SpacepointWriter config
@@ -314,6 +317,7 @@ int main(int argc, char *argv[]){
   refitCfg.inputMeasurements = measurements;
   refitCfg.outputTracks = "refitted_tracks";
   refitCfg.trackingGeometry = trackingGeometry;
+  // refitCfg.surfaceByIdentifier = trackingGeometry->geoIdSurfaceMap();
   refitCfg.magneticField = fatrasCfg.magneticField;
 
   ActsExamples::RootTrackSummaryWriter::Config trackRefitSummaryWriterCfg;
@@ -325,7 +329,7 @@ int main(int argc, char *argv[]){
 
   // Sequencer config
   ActsExamples::Sequencer::Config sequencerCfg;
-  sequencerCfg.numThreads = 1;
+  sequencerCfg.numThreads = 30;
   sequencerCfg.events = nEvents;
   sequencerCfg.logLevel = logLevelSequencer;
 
@@ -339,24 +343,26 @@ int main(int argc, char *argv[]){
     sequencer.addReader(std::make_shared<ActsExamples::RootParticleReader>(particleReaderCfg, logLevel));
     sequencer.addReader(std::make_shared<ActsExamples::RootSimHitReader>(simhitReaderCfg, logLevel));
   }
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::DigitizationAlgorithm>(digiCfg, logLevelDigi));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::SpacePointMaker>(spCfg, logLevel));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::SeedingAlgorithm>(seedingCfg, logLevelSeed));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackParamsEstimationAlgorithm>(paramsEstimationCfg, logLevel));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackFindingAlgorithm>(trackFindingCfg, logLevelFinder));
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::MyRefittingAlgorithm>(refitCfg, logLevelMyRefit));
 
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackTruthMatcher>(trackTruthMatcherCfg, logLevelMatcher));
-
-
-  sequencer.addWriter(std::make_shared<ActsExamples::RootParticleWriter>(particleWriterCfg, logLevel));
-  sequencer.addWriter(std::make_shared<ActsExamples::RootSimHitWriter>(simhitWriterCfg, logLevel));
-  sequencer.addWriter(std::make_shared<ActsExamples::RootMeasurementWriter>(measWriterCfg, logLevelMeasWriter));
-  sequencer.addWriter(std::make_shared<ActsExamples::RootSpacepointWriter>(spWriterCfg, logLevel));
-  sequencer.addWriter(std::make_shared<ActsExamples::RootSeedWriter>(seedWriterCfg, logLevel));
-  sequencer.addWriter(std::make_shared<ActsExamples::RootTrackStatesWriter>(trackStatesWriterCfg, logLevel));
-  sequencer.addWriter(std::make_shared<ActsExamples::RootTrackSummaryWriter>(trackSummaryWriterCfg, logLevel));
-  sequencer.addWriter(std::make_shared<ActsExamples::RootTrackSummaryWriter>(trackRefitSummaryWriterCfg, logLevel));
+//  sequencer.addAlgorithm(std::make_shared<ActsExamples::DigitizationAlgorithm>(digiCfg, logLevelDigi));
+//
+//  sequencer.addAlgorithm(std::make_shared<ActsExamples::SpacePointMaker>(spCfg, logLevel));
+//  sequencer.addAlgorithm(std::make_shared<ActsExamples::SeedingAlgorithm>(seedingCfg, logLevelSeed));
+//  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackParamsEstimationAlgorithm>(paramsEstimationCfg, logLevel));
+//  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackFindingAlgorithm>(trackFindingCfg, logLevelFinder));
+//
+//  sequencer.addAlgorithm(std::make_shared<ActsExamples::MyRefittingAlgorithm>(refitCfg, logLevelMyRefit));
+//  sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackTruthMatcher>(trackTruthMatcherCfg, logLevelMatcher));
+//
+//  sequencer.addWriter(std::make_shared<ActsExamples::RootParticleWriter>(particleWriterCfg, logLevel));
+//  sequencer.addWriter(std::make_shared<ActsExamples::RootSimHitWriter>(simhitWriterCfg, logLevel));
+//  sequencer.addWriter(std::make_shared<ActsExamples::RootMeasurementWriter>(measWriterCfg, logLevelMeasWriter));
+//  sequencer.addWriter(std::make_shared<ActsExamples::RootSpacepointWriter>(spWriterCfg, logLevel));
+//  sequencer.addWriter(std::make_shared<ActsExamples::RootSeedWriter>(seedWriterCfg, logLevel));
+//  sequencer.addWriter(std::make_shared<ActsExamples::RootTrackStatesWriter>(trackStatesWriterCfg, logLevel));
+//  sequencer.addWriter(std::make_shared<ActsExamples::RootTrackSummaryWriter>(trackSummaryWriterCfg, logLevel));
+//
+//  sequencer.addWriter(std::make_shared<ActsExamples::RootTrackSummaryWriter>(trackRefitSummaryWriterCfg, logLevel));
 
   sequencer.run();
 

@@ -1,5 +1,4 @@
-#ifndef tracker_config
-#define tracker_config
+#pragma once
 
 double bz = 0.5;    // T
 
@@ -42,6 +41,3 @@ const int nSectors = 12;
 double fwdRMin = 0.;
 double fwdRMax = rMaxFrameCircum2 + eps;
 double fwdHalfZ = positions.back()+10; // cm
-
-
-#endif
