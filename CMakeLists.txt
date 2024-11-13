@@ -3,7 +3,7 @@ project(acts-fwd-tracker)
 
 # debug build
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+# set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
 # release build
@@ -30,7 +30,6 @@ find_package(Eigen3 REQUIRED HINTS "${SW}/Eigen3/latest")
 find_package(Acts REQUIRED)
 
 include_directories(
-        $ENV{PWD}
         ${SW}/TBB/latest/include
         ${SW}/nlohmann_json/latest/include
         ${SW}/ROOT/latest/include
@@ -43,8 +42,11 @@ link_directories(
         ${SW}/GEANT4/latest/lib
         )
 
+file(GLOB headers ${PROJECT_SOURCE_DIR}/*.h)
+file(GLOB sources ${PROJECT_SOURCE_DIR}/*.cpp)
+
 # main exec
-add_executable(${PROJECT_NAME} main.cpp tracker.h tracker_config.h)
+add_executable(${PROJECT_NAME} main.cpp ${sources})
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
         ActsCore
@@ -62,6 +64,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
         ActsExamplesTrackFinding
         ActsExamplesTrackFitting
         ActsExamplesTruthTracking
+        ActsExamplesGeant4
         tbb
         Core
         Tree

@@ -39,6 +39,7 @@ Acts::TrackingGeometry* CreateTrackingGeometry(bool addROC = 1, bool addFlange =
   auto* nist = G4NistManager::Instance();
   G4Material* siMat = nist->FindOrBuildMaterial("G4_Si");
   G4Material* alMat = nist->FindOrBuildMaterial("G4_Al");
+  // G4Material* pbMat = nist->FindOrBuildMaterial("G4_Pb");
   G4Material* worldMat = nist->FindOrBuildMaterial("G4_Galactic");
 
   Acts::Geant4MaterialConverter converter;
