@@ -28,14 +28,31 @@ class MySpacePointMaker final : public IAlgorithm {
     std::shared_ptr<const Acts::TrackingGeometry> trackingGeometry;
     std::vector<Acts::GeometryIdentifier> geometrySelection;
   };
+
+  struct Candidate {
+    std::vector<ActsExamples::IndexSourceLink> sourceLinks;
+    int station = -1;
+    double chi2 = -1;
+    double tx = 0;
+    double ty = 0;
+    double k = 0;
+    int sharedMeasurements = 0;
+    double x = 0;
+    double y = 0;
+    double z = 0;
+  };
+
   MySpacePointMaker(Config cfg, Acts::Logging::Level lvl);
   ProcessCode execute(const AlgorithmContext& ctx) const override;
   const Config& config() const { return m_cfg; }
   double analytic(std::vector<double> &a, std::vector<double> &b, std::vector<double> &g, std::vector<double> &s, 
                   double &t, double &k, double &dt, double &dk, bool debug = 0) const;
   
-  double helix(std::vector<double> &z, std::vector<double> &c, std::vector<double> &s, std::vector<double> &g, 
+  double helix(std::vector<double> &z, std::vector<double> &s, std::vector<double> &c, std::vector<double> &g, 
                std::vector<double> &d, double &tx, double &ty, double &p, bool debug = 0) const;
+
+  // double parabolic(const std::vector<double>& z, const std::vector<double>& s,  const std::vector<double>& c,  
+  //                  const std::vector<double>& g, const std::vector<double>& d, double &tx, double &ty, double &k) const;
 
  private:
   Config m_cfg;
