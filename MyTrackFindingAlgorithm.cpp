@@ -10,6 +10,8 @@
 #include "Acts/TrackFitting/GainMatrixUpdater.hpp"
 #include "ActsFatras/EventData/Barcode.hpp"
 
+namespace My{
+
 MyTrackFindingAlgorithm::MyTrackFindingAlgorithm(Config config, Acts::Logging::Level level)
     : IAlgorithm("MyTrackFindingAlgorithm", level), m_cfg(std::move(config)) {
   ACTS_INFO("Constructor for my track finder");
@@ -105,4 +107,6 @@ ProcessCode MyTrackFindingAlgorithm::execute(const AlgorithmContext& ctx) const 
   m_outputTracks(ctx, std::move(constTracks));
 
   return ProcessCode::SUCCESS;
+}
+
 }

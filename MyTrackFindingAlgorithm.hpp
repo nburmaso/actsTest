@@ -15,6 +15,8 @@
 #include "ActsExamples/EventData/Index.hpp"
 //#include "ActsExamples/EventData/IndexSourceLink.hpp"
 
+namespace My{
+
 using ActsExamples::ReadDataHandle;
 using ActsExamples::WriteDataHandle;
 using ActsExamples::IAlgorithm;
@@ -218,3 +220,5 @@ class MyTrackFindingAlgorithm final : public IAlgorithm {
   ReadDataHandle<TrackParametersContainer> m_inputInitialTrackParameters{this, "InputInitialTrackParameters"};
   WriteDataHandle<ConstTrackContainer> m_outputTracks{this, "OutputTracks"};
 };
+
+} // namespace My

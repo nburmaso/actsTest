@@ -51,6 +51,7 @@ ProcessCode MyTrackWriter::writeT(const AlgorithmContext& ctx, const ConstTrackC
     m_eQOP_fit.push_back(param[Acts::eBoundQOverP]);
     std::vector<int> measurementIds;
     for (const auto& state : track.trackStatesReversed()) {
+      if (!state.typeFlags().test(Acts::TrackStateFlag::MeasurementFlag)) continue;
       auto measId = state.getUncalibratedSourceLink().template get<ActsExamples::IndexSourceLink>().index();
       measurementIds.push_back(measId);
     }

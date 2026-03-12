@@ -55,11 +55,11 @@ bool isGoodRecoFtd(int64_t layerMask, int minHits = 5, int shift = 3){
     nHits[st] += (layerMask & (1ull << (7*st + shift + 5))) > 0;
     nHits[st] += (layerMask & (1ull << (7*st + shift + 6))) > 0;
   }
-  if (nHits[0]<2) return 0;
-  if (nHits[1]<2) return 0;
-  if (nHits[2]<2) return 0;
-  if (nHits[3]<2) return 0;
-  if (nHits[4]<2) return 0;
+  if (nHits[0]<1) return 0;
+  if (nHits[1]<1) return 0;
+  if (nHits[2]<1) return 0;
+  if (nHits[3]<1) return 0;
+  if (nHits[4]<1) return 0;
   return 1;
 }
 

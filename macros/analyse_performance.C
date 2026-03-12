@@ -52,6 +52,7 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5, int shift = 3){
   for (int st=0;st<5;st++){
     nSeeds[st] += (layerMask & (1ull << (7*st + shift + 3))) > 0;
   }
+  // printf("%d %d %d\n", nSeedsB, nSeeds[2], nSeedsF);
   if (nSeedsB<1) return 0;
   if (nSeedsF<1) return 0;
   // if (nSeeds[0]<1) return 0;
@@ -60,11 +61,11 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5, int shift = 3){
   return 1;
 }
 
-void analyse_performance(TString dir = "../build/test/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
-//void analyse_performance(TString dir = "../acts/", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
+//void analyse_performance(TString dir = "../build/test/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
+void analyse_performance(TString dir = "../acts/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../pi90/acts/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../acts_pi_16/", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
-  gStyle->SetOptStat(0);
+  // gStyle->SetOptStat(0);
   // setup particles
   TFile* fPart = new TFile(TString(dir + "particles.root"));
   TTree* tPart = (TTree*) fPart->Get("particles");
@@ -115,12 +116,12 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.7, d
 
     for (int it=0; it<m_majorityParticleId->size(); it++){
       auto barcode = ActsFatras::Barcode().withData(m_majorityParticleId->at(it));
-      auto loc0 = m_eLOC0_fit->at(it);
-      auto loc1 = m_eLOC1_fit->at(it);
-      hLOC0fit->Fill(loc0);
-      hLOC1fit->Fill(loc1);
-      if (fabs(loc0)>8) continue;
-      if (fabs(loc1)>8) continue;
+      // auto loc0 = m_eLOC0_fit->at(it);
+      // auto loc1 = m_eLOC1_fit->at(it);
+      // hLOC0fit->Fill(loc0);
+      // hLOC1fit->Fill(loc1);
+      // if (fabs(loc0)>8) continue;
+      // if (fabs(loc1)>8) continue;
       int ip = barcode.particle()-1;
       if (ip<0) continue;
       if (vMatched[ev][ip]<1) vMatched[ev][ip]=1;
@@ -144,8 +145,6 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.7, d
   hLOC0fit->Draw();
   new TCanvas;
   hLOC1fit->Draw();
-  new TCanvas;
-  hNLayers->Draw();
   // setup measurements
   TFile* fMeas = new TFile(TString(dir + "measurements.root"));
   TTree* tMeas = (TTree*) fMeas->Get("measurements");
@@ -218,8 +217,8 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.7, d
   TH1D* hRcPtPr = new TH1D("hRcPtPr","",100,0.,1.);
   TH1D* hRcPhiPi = new TH1D("hRcPhiPi","",180,-M_PI,M_PI);
   TH1D* hRcPhiPr = new TH1D("hRcPhiPr","",180,-M_PI,M_PI);
-  TH1D* hNumberOfMatched = new TH1D("hNumberOfMatched","",100,0.,1.);
-  TH1D* hNumberOfGood = new TH1D("hNumberOfGood","",100,0.,1.);
+  TH1D* hNumberOfMatchedPi = new TH1D("hNumberOfMatchedPi","",100,0.,1.);
+  TH1D* hNumberOfGoodPi = new TH1D("hNumberOfGoodPi","",100,0.,1.);
 
   // setup performance
   // TFile* fPerf = new TFile(TString(dir + "performance_ckf.root"));
@@ -256,8 +255,8 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.7, d
       if (abs(pdg)==2212) hRcPtPr->Fill(pt);
       if (abs(pdg)== 211) hRcPhiPi->Fill(phi);
       if (abs(pdg)==2212) hRcPhiPr->Fill(phi);
-      hNumberOfMatched->Fill(pt,vNumberOfMatched[ev][ip]);
-      hNumberOfGood->Fill(pt,1);
+      if (abs(pdg)== 211) hNumberOfMatchedPi->Fill(pt,vNumberOfMatched[ev][ip]);
+      if (abs(pdg)== 211) hNumberOfGoodPi->Fill(pt,1);
     }
   }
 
@@ -269,8 +268,10 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.7, d
   double nSeeds = hSeedPtPi->Integral();
   printf("nBest/nSeeds=%f\n",nBest/nSeeds);
   new TCanvas;
-  int nRc = hNumberOfMatched->Integral();
+  int nRc = hNumberOfMatchedPi->Integral();
   printf("nRc/nBest=%f\n",nRc/nBest);
-  hNumberOfMatched->Divide(hNumberOfMatched,hNumberOfGood,1,1,"B");
-  hNumberOfMatched->Draw();
+  hNumberOfMatchedPi->Divide(hNumberOfMatchedPi,hNumberOfGoodPi,1,1,"B");
+  hNumberOfMatchedPi->Draw();
+  new TCanvas;
+  hNLayers->Draw();
 }

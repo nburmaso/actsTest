@@ -14,9 +14,9 @@ HelixFitResult fitHelixLinear(
     const std::vector<double>& s,
     const std::vector<double>& g
 ) {
-    const int n = z.size();
-    if (c.size() != n || s.size() != n || g.size() != n)
-        throw std::runtime_error("Input vectors must have same length");
+    const int n = c.size();
+    // if (c.size() != n || s.size() != n || g.size() != n)
+    //     throw std::runtime_error("Input vectors must have same length");
 
     Eigen::MatrixXd A(n, 4);
     Eigen::VectorXd b(n);
@@ -48,8 +48,6 @@ HelixFitResult fitHelixLinear(
     return {tx, ty, k};
 }
 
-#include <iostream>
-
 void parabolic_spacepoint_maker_linearized() {
   const int n = 5;
   std::vector<double> r = { 100,  100,  100,  100,  100}; // station minimal radius
@@ -65,7 +63,7 @@ void parabolic_spacepoint_maker_linearized() {
   std::vector<double> c(n);
   std::vector<double> s(n);
   std::vector<double> g(n);
-  double sigma = 0.001;
+  double sigma = 0.01;
 
   double tTrue = tan(thetaTrue);
   double pTrue = tTrue/rTrue; 
@@ -103,6 +101,64 @@ void parabolic_spacepoint_maker_linearized() {
   auto res = fitHelixLinear(z,c,s,g);
   printf("tx=%f\n",res.tx);
   printf("ty=%f\n",res.ty);
-  printf("k=%f\n",res.k);
+  printf("k=%e\n",res.k);
+
+  double chi2 = 0;
+  for (int i=0;i<n;i++){
+    double chi = (s[i]*res.tx - c[i]*res.ty + z[i]*c[i]*res.k*res.tx + z[i]*s[i]*res.k*res.ty + g[i])/d[i];
+    chi2 += chi*chi;
+  }
+  printf("chi2=%f\n",chi2);
+
+
+  // minimization algorithm  
+  double xx[3];
+  xx[0] = kTrue;
+  xx[1] = txTrue;
+  xx[2] = tyTrue;
+
+  auto func = [&n,&s,&c,&z,&g](const double* xx) {
+    double k = xx[0];
+    double tx = xx[1];
+    double ty = xx[2];
+    double d2 = 0;
+    for (int i=0;i<n;i++){
+      double sk = s[i] + k*z[i]*c[i];
+      double ck = c[i] - k*z[i]*s[i];
+      double d = sk*tx - ck*ty + g[i];
+    // printf("%f %f %f %f %f %f\n",d,tx,ty,sk,ck,g[i]);
+      d2+=d*d;
+    }
+    return d2;
+  };
+
+  printf("%f\n",func(xx));
+
+  ROOT::Math::Functor f(func,3);
+  ROOT::Math::Minimizer* minimum = ROOT::Math::Factory::CreateMinimizer("Minuit2", "");
+  minimum->SetMaxFunctionCalls(1000000); // for Minuit/Minuit2
+  minimum->SetMaxIterations(10000);  // for GSL
+  minimum->SetTolerance(0.0001);
+  minimum->SetPrintLevel(1);
+  minimum->SetFunction(f);
+  minimum->SetVariable(0,"k",kTrue, 0.01);
+  minimum->SetVariable(1,"tx",txTrue, 0.01);
+  minimum->SetVariable(2,"ty",tyTrue, 0.01);
+  // minimum->FixVariable(1);
+  // minimum->FixVariable(2);
+  minimum->Minimize();
+  auto xs = minimum->X();
+//   kk = xs[0];
+//   tx = xs[1];
+//   ty = xs[2];
+//   printf("tx=%f\n",tx);
+//   printf("ty=%f\n",ty);
+//   printf("k=%e\n",kk);
+  double chi2min = 0;
+  for (int i=0;i<n;i++){
+    double chi = (s[i]*xs[1] - c[i]*xs[2] + z[i]*c[i]*xs[0]*xs[1] + z[i]*s[i]*xs[0]*xs[2] + g[i])/d[i];
+    chi2min += chi*chi;
+  }
+  printf("chi2min=%f\n",chi2min);
 
 }

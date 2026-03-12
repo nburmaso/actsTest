@@ -73,7 +73,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   int nStations = 5; // TODO read from config
 //  std::list<std::vector<ActsExamples::IndexSourceLink>> candidates[nStations];
   std::list<Candidate> candidates[nStations];
-
+  std::list<Candidate>::iterator candIt;
   double rMax = 1300; // FIXME Extract from surface dimensions
   for (auto& isl : measurements.orderedIndices()) {
     const auto geoId = isl.geometryId();
@@ -81,8 +81,6 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     const auto layerId = geoId.layer();
     int iStation = (layerId-shift)/7;
     int iLayer = (layerId-shift)%7;
-
-    ACTS_DEBUG("volumeId= " << volumeId << " layerId=" << layerId);
     Acts::SourceLink slink{isl};
 
     if ((layerId-shift)%7==3 || layerId==2 || layerId==38) {
@@ -100,15 +98,25 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
         backStrips.emplace_back(std::make_pair(slink, std::make_pair(gpos1, gpos2)));
       }
     } else {
+      if (iStation>0) continue;
       int iStraw = geoId.sensitive();
+      ACTS_DEBUG("iLayer=" << iLayer << " iStraw=" << iStraw);
+      const auto [par, cov] = accessor(slink);
+      const Acts::Surface* surface = m_slSurfaceAccessor.value()(slink);
+      auto xyz = surface->localToGlobal(ctx.geoContext, Acts::Vector2(par[0],0), Acts::Vector3());
+      ACTS_DEBUG("iLayer=" << iLayer << " iStraw=" << iStraw << " x=" << xyz[0] << " y=" << xyz[1]);
       // construct sp candidates as vectors of index source links from the same station corresponding to
       // straws with similar straw ids (~similar angles)
-      for (auto& candidate : candidates[iStation]){
+      for (candIt = candidates[iStation].begin(); candIt!=candidates[iStation].end(); ++candIt){
+      //for (auto& candidate : candidates[iStation]){
+        Candidate& candidate = *candIt;
         bool isCompatibleCandidate = 1;
+        ACTS_DEBUG(" Checking candidate");
         for (auto& isl2 : candidate.sourceLinks){
           const auto geoId2 = isl2.geometryId();
           int iLayer2 = (geoId2.layer()-shift)%7;
           int iStraw2 = geoId2.sensitive();
+          ACTS_DEBUG("    Checking iLayer2=" << iLayer2 << " iStraw2=" << iStraw2);
           int layerDif = iLayer - iLayer2;
           int strawDif = iStraw - iStraw2;
           if (layerDif<=0) { isCompatibleCandidate = 0; break ; } // should be imposible by construction
@@ -119,11 +127,22 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
             if ((iLayer2==1 || iLayer2==5) && (strawDif<-6 || strawDif>4)) { isCompatibleCandidate = 0; break ; };
           } else if (layerDif==2){
             if ((iLayer2==0 || iLayer2==4) && (strawDif<-4 || strawDif>2)) { isCompatibleCandidate = 0; break ; };
+            if ((iLayer2==2) && (strawDif<-4 || strawDif>2)) { isCompatibleCandidate = 0; break ; };
+          } else if (layerDif==3){
+            if ((iLayer2==1) && (strawDif<-2 || strawDif>3)) { isCompatibleCandidate = 0; break ; };
+            if ((iLayer2==2) && (strawDif<-6 || strawDif>4)) { isCompatibleCandidate = 0; break ; };
+          } else if (layerDif==5){
+            if ((iLayer2==0) && (strawDif<-2 || strawDif>3)) { isCompatibleCandidate = 0; break ; };
+            if ((iLayer2==1) && (strawDif<-6 || strawDif>4)) { isCompatibleCandidate = 0; break ; };
+          } else if (layerDif==6){
+            if ((iLayer2==0) && (strawDif<-4 || strawDif>2)) { isCompatibleCandidate = 0; break ; };
           }
         }
         if (!isCompatibleCandidate) continue;
-        candidate.sourceLinks.push_back(isl);
+        ACTS_DEBUG("Copy existing candidate");
+        candidates[iStation].insert(candIt, *candIt);
         ACTS_DEBUG("Adding new measurement to existing candidate");
+        candidate.sourceLinks.push_back(isl);
       }
       if (iLayer==0 || iLayer==1 || iLayer==2 || iLayer==4){
         std::vector<ActsExamples::IndexSourceLink> new_candidate;
@@ -141,7 +160,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       auto& candidate = *it;
       ACTS_DEBUG("  candidate.size=" << candidate.sourceLinks.size());
       for (auto& isl : candidate.sourceLinks) {
-        ACTS_DEBUG("   layer=" << isl.geometryId().layer() << " straw=" << isl.geometryId().sensitive());
+        ACTS_DEBUG("   layer=" << (isl.geometryId().layer()-shift)%7 << " straw=" << isl.geometryId().sensitive());
       }
       if (candidate.sourceLinks.size()<3) {
         ACTS_DEBUG(  "erasing...");
@@ -151,6 +170,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       }
     }
   }
+  // return ActsExamples::ProcessCode::SUCCESS;
   ACTS_DEBUG("making space points from straws");
 
 

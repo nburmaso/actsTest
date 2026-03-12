@@ -49,6 +49,7 @@ add_executable(${PROJECT_NAME}
         MyDigitizationAlgorithm.cpp
 #        MyTrackFindingAlgorithm.cpp
         MyTrackWriter.cpp
+        MyFtdGeo.cxx
         )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC

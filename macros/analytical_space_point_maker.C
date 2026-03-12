@@ -17,7 +17,7 @@ double func(const double* xx){
   return d2;
 }
 
-void analytic(double &t, double &k, double &dt, double &dk, double& A, double& B, double& sigA2, double& sigB2, double& covAB, bool debug = 0){
+double analytic(double &t, double &k, double &dt, double &dk, double& A, double& B, double& sigA2, double& sigB2, double& covAB, bool debug = 0){
   // analytical computation
   double s[n];
   double aa[n]={0};
@@ -92,6 +92,15 @@ void analytic(double &t, double &k, double &dt, double &dk, double& A, double& B
   }
   dt = sqrt(dt2);
   if (debug) printf("t=%e dt=%e dt/t=%f\n",t,dt,dt/t);
+
+  double chi2 = 0;
+  double cosa = 1./sqrt(1+k*k);
+  double sina = k*cosa;
+  for (int i=0;i<n;i++){
+    double d = a[i]*t*cosa + b[i]*t*sina + c[i];
+    chi2+=d*d/s[i]/s[i];
+  }
+  return chi2;
 }
 
 void analytical_space_point_maker(){
@@ -100,9 +109,9 @@ void analytical_space_point_maker(){
   double alphaTrue = alphaTrueDeg*TMath::DegToRad();
   double tTrue = tan(thetaTrue);
   double kTrue = tan(alphaTrue);
-  double r[] = { 100,  100,  100}; // station minimal radius
-  double z[] = {2100, 2110, 2120}; // station pozition
-  double phiDeg[] = {alphaTrueDeg-4, alphaTrueDeg+1, alphaTrueDeg+6};
+  double r[] = { 100,  100,  100,  100,  100}; // station minimal radius
+  double z[] = {2100, 2110, 2120, 2130, 2140}; // station pozition
+  double phiDeg[] = {alphaTrueDeg-4, alphaTrueDeg+1, alphaTrueDeg+6, alphaTrueDeg-3, alphaTrueDeg+3};
   double d[n];
   double phi[n];
   double xTrue[n];
@@ -174,8 +183,8 @@ void analytical_space_point_maker(){
   TH2D* hAB = new TH2D("hAB",";A;B;",100,A0-0.02,A0+0.02,100,B0-0.02,B0+0.02);
   TH2D* hCK = new TH2D("hCK",";C;K;",100,1-1e-2,1+1e-2, 100,1-1e-2,1+1e-2);
   TH2D* hPullKT = new TH2D("kPullKT",";pull k;pull t;",100,-5,5,100,-5,5);
-
-  for (int ev=0;ev<100000;ev++){
+  TH1D* hChi2 = new TH1D("hChi2","",1000,0,30);
+  for (int ev=0;ev<1000000;ev++){
     //if (ev%100==0) printf("%d\n",ev);
     for (int i=0;i<n;i++){
       d[i] = gRandom->Gaus(0,sigma);
@@ -183,7 +192,7 @@ void analytical_space_point_maker(){
       ymeas[i] = yTrue[i]-d[i]*cos(phi[i]);
       c[i] = -xmeas[i]*sin(phi[i]) + ymeas[i]*cos(phi[i]);
     }  
-    analytic(t,k,dt,dk,A,B,sigA2,sigB2,covAB);
+    double chi2 = analytic(t,k,dt,dk,A,B,sigA2,sigB2,covAB);
     hT->Fill(t);
     hK->Fill(k);
     hKT->Fill(k,t);
@@ -195,6 +204,7 @@ void analytical_space_point_maker(){
     hCK->Fill(c[0]/c0true,k/kTrue);
     hPullT->Fill(pullT);
     hPullKT->Fill(pullK,pullT);
+    hChi2->Fill(chi2);
   }
   new TCanvas;
   hK->Draw();
@@ -219,4 +229,6 @@ void analytical_space_point_maker(){
   hKT->Draw();
   new TCanvas;
   hPullKT->Draw();
+  new TCanvas;
+  hChi2->Draw();
 }
