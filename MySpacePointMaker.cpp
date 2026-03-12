@@ -139,8 +139,8 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
           }
         }
         if (!isCompatibleCandidate) continue;
-        ACTS_DEBUG("Copy existing candidate");
-        candidates[iStation].insert(candIt, *candIt);
+        // ACTS_DEBUG("Copy existing candidate");
+        // candidates[iStation].insert(candIt, *candIt);
         ACTS_DEBUG("Adding new measurement to existing candidate");
         candidate.sourceLinks.push_back(isl);
       }
@@ -237,7 +237,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
 // //      ACTS_DEBUG("  n=" << n << " tx=" << tx <<" ty=" << ty << " chi2/ndf=" << chi2helix/(n-2));
 //       ACTS_DEBUG("  n=" << n << " t=" << sqrt(tx*tx+ty*ty) <<" k=" << ty/tx << " chi2/ndf=" << (n>3 ? chi2parabolic/(n-3) : chi2parabolic));
       if (n>3) chi2helix/=(n-3);
-      if (chi2helix>2000) {
+      if (chi2helix>1000) {
         ACTS_DEBUG("  erasing...");        
         it = candidates[iStation].erase(it);
       } else {
@@ -354,7 +354,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   spOpt.paramCovAccessor = accessor;
 
   for (auto& slink : twoDimMeasurements) {
-    m_spacePointBuilder.buildSpacePoint(ctx.geoContext, {slink}, spOpt, std::back_inserter(spacePoints));
+    // m_spacePointBuilder.buildSpacePoint(ctx.geoContext, {slink}, spOpt, std::back_inserter(spacePoints));
   }
 
   spacePoints.shrink_to_fit();

@@ -149,8 +149,8 @@ int main(int argc, char *argv[]){
   // genCfg.pMin = 1.2;
   // genCfg.pMax = 1.21;
   genCfg.randomizeCharge = true;
-  genCfg.numParticles = 90;
-//  genCfg.numParticles = 10;
+//  genCfg.numParticles = 90;
+  genCfg.numParticles = 10;
   ActsExamples::EventGenerator::Generator gen{
       std::make_shared<ActsExamples::FixedMultiplicityGenerator>(1),
       std::make_shared<ActsExamples::FixedPrimaryVertexPositionGenerator>(),
