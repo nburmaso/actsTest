@@ -5,7 +5,8 @@
 #include "../MyFtdGeo.h"
 // for single-track events only
 //void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected_layer = 4){
-void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected_layer = 4){
+//void analyse_spacepoint_resolution(TString dir = "../build/test02_18", int selected_layer = 4){
+void analyse_spacepoint_resolution(TString dir = "../build/test02_16", int selected_layer = 4){
   dir.Append("/");
   MyFtdGeo fg;
   double lz = fg.GetLayerPositions()[selected_layer];
@@ -30,12 +31,14 @@ void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected
   tMeas->SetBranchAddress("true_z",&m_true_z);
   
   vector<int> vn(nEvents,0);
+  vector<vector<int>> vm(nEvents);
   for (int im=0; im<tMeas->GetEntries(); im++){
     tMeas->GetEntry(im);
     int layerType = fg.GetLayerType(m_layer_id-2);
     if (layerType == 2) continue;
     if (fabs(m_true_z/10-lz)>3.1) continue;
     vn[m_event_id]++;
+    vm[m_event_id].push_back(m_layer_id-2);
   }
 
   TFile* fHits = new TFile(dir + "hits.root");
@@ -110,7 +113,15 @@ void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected
 
     hXY->Fill(sx,sy);
     hDxDy->Fill(dx,dy);
-    if (fabs(dp)<0.1) printf("event=%d n=%d\n",sevent_id,vn[sevent_id]);
+    if (dp>0.4) {//printf("event=%d n=%d\n",sevent_id,vn[sevent_id]);
+    //if (fabs(dp)<0.1) {
+      printf("event=%d n=%d ",sevent_id,vn[sevent_id]);
+      for (auto k : vm[sevent_id]){
+        printf("%d ",k);
+      }
+      printf("\n");
+    }
+//    if (fabs(dp)>0.4) printf("event=%d n=%d\n",sevent_id,vn[sevent_id]);
   }
 
   TH1D* hN = new TH1D("hN","",10,0,10);
@@ -119,6 +130,7 @@ void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected
   }
   new TCanvas;
   hN->Draw();
+  new TCanvas;
 
   hXY->Draw();
   new TCanvas;

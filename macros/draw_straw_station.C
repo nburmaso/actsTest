@@ -18,8 +18,8 @@
 using namespace std;
 
 // set layer corresponding to fake surface in the middle of the station
-void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool draw_spacepoints = 1, bool zoom = 0){
-  TString dir = "../build/test";
+void draw_straw_station(int selected_event = 9973, int selected_layer = 4, bool draw_spacepoints = 1, bool zoom = 0){
+  TString dir = "../build/test02";
   dir.Append("/");
 
   MyFtdGeo fg;
