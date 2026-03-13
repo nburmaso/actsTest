@@ -150,7 +150,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     int layerType = ftdGeo->GetLayerType(iL);
     if (layerType == FtdLayerTypes::kPixel) continue;
     int station = ftdGeo->GetLayerStation(iL);
-    // if (station > 0) continue;
+    if (station > 0) continue;
     auto& candList = candidates[station];
     Candidate cand;  // starts empty
     cand.station = station;
