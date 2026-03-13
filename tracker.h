@@ -1,5 +1,5 @@
-#ifndef tracker
-#define tracker
+#pragma once
+
 #include "tracker_config.h"
 
 #include "Acts/Definitions/Units.hpp"
@@ -272,5 +272,3 @@ Acts::TrackingGeometry* CreateTrackingGeometry(bool addROC = 0, bool addFlange =
 
   return trackingGeometry;
 }
-
-#endif

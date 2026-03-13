@@ -8,11 +8,18 @@
 
 using std::numbers::pi;
 
-class MyFtdGeo : public TObject
+class MyFtdGeo
 {
 public:
   MyFtdGeo() = default;
   virtual ~MyFtdGeo(){}
+
+  enum FtdLayerTypes {
+    kPixel = 2,
+    kStrawR = 4,
+    kStrawU = 5,
+    kStrawV = 6
+  };
 
   double GetField() const { return fBz; }
 
@@ -35,7 +42,9 @@ public:
   int    GetLayerType(int iLayer) const { return fLayerType[iLayer]; }
   double GetLayerStripWidth(int iLayer) const { return fLayerStripWidth[iLayer]; }
   int    GetNumberOfLayers() const { return fLayerPositions.size(); }
+  int    GetNumberOfStations() const { return fNStations; }
   int    GetNLayersPerStation() const { return fLayersPerStation; }
+  int    GetLayerStation(int iLayer) const{ return fLayerStations[iLayer]; }
   double GetLayerStereoAngle(int iLayer) const { return fLayerType[iLayer]==5 ? fTubeIncl : (fLayerType[iLayer]==6 ? -fTubeIncl : 0); }
   double GetLayerCenterR(int iLayer) const { return (fLayerRMin[iLayer]+fLayerRMax[iLayer])/2.; }
   double GetTubeCenterAngle(int iLayer, int iTube) const { return fLayerAngle[iLayer] + 2*pi/fLayerNumberOfTubes[iLayer]*(iTube + 0.5); }
@@ -82,7 +91,7 @@ public:
   bool IsGeometrySimple() const { return fGeometrySimple; }
 private:
   const double fBz{0.5};  // T
-  
+
   // 5 pixel-like FTD stations + 1 pixel-like TOF
 //  const bool fGeometrySimple = kTRUE;
 //  const std::vector<double> fLayerPositions{{210, 232.5, 255, 277.5, 300., 350.}}; // cm
@@ -235,7 +244,19 @@ private:
 
 // 5 stations with 6 layers of 5mm straw tubes + 1 fake pixel-like layer for seeding
   const bool fGeometrySimple = false;
+  const int fNStations = 5;
   const int fLayersPerStation = 7;
+
+  const std::vector<int> fLayerStations{{
+    0,
+    0, 0, 0, 0, 0, 0, 0,
+    1, 1, 1, 1, 1, 1, 1,
+    2, 2, 2, 2, 2, 2, 2,
+    3, 3, 3, 3, 3, 3, 3,
+    4, 4, 4, 4, 4, 4, 4
+   ,4
+  }}; // cm
+
   const std::vector<double> fLayerPositions{{
     207,
     210, 210.8, 211.6, 212., 212.4, 213.2, 214.,
@@ -316,7 +337,7 @@ private:
     130, 130, 130., 130, 130, 130, 130.,
     130, 130, 130., 130, 130, 130, 130.,
     130, 130, 130., 130, 130, 130, 130., 130.
-  }}; // cm  
+  }}; // cm
 
   const double fEps = 1e-12;
 
@@ -355,6 +376,4 @@ private:
   const double fRMax{std::sqrt(2.) * fLayerRMax.back() + 0.2}; // ~ 184 cm
   const double fFtdRMin{fFrameRMin1 - fEps}; // cm
   const double fFtdRMax{fFrameRMax2 + fEps}; // cm
-
-  ClassDef(MyFtdGeo, 1)
 };

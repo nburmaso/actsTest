@@ -20,9 +20,19 @@ find_package(Geant4 REQUIRED vis_all ui_all)
 include(${Geant4_USE_FILE})
 
 find_package(Eigen3 REQUIRED HINTS "${SW}/Eigen3/latest")
+
+find_package(ROOT REQUIRED)
+if(ROOT_FOUND)
+    message(STATUS "Found ROOT")
+    message(STATUS "ROOT includes: ${ROOT_INCLUDE_DIRS}")
+    message(STATUS "ROOT libs: ${ROOT_LIBRARY_DIR}, ${ROOT_LIBRARIES}")
+endif()
+
 find_package(Acts REQUIRED)
 
-include_directories(
+include(${ROOT_USE_FILE})
+
+set(PROJECT_INCLUDE_DIRS
         $ENV{PWD}
         ${SW}/Boost/latest/include
         ${SW}/Eigen3/latest/include/eigen3
@@ -33,23 +43,28 @@ include_directories(
         ${SW}/GEANT4/latest/include
         ${HEPMC3_INCLUDE_DIR}
 )
-link_directories(
+
+set(PROJECT_LINK_DIRS
         ${SW}/TBB/latest/lib
         ${SW}/ACTS/latest/lib
-        ${SW}/ROOT/latest/lib
         ${SW}/GEANT4/latest/lib
-        )
+        ${ROOT_LIBRARY_DIR}
+)
+
+include_directories(${PROJECT_INCLUDE_DIRS})
+
+link_directories(${PROJECT_LINK_DIRS})
 
 # main exec
 add_executable(${PROJECT_NAME} 
-        main.cpp 
-#        tracker.h 
-#        tracker_config.h 
+        main.cpp
         MySpacePointMaker.cpp 
         MyDigitizationAlgorithm.cpp
 #        MyTrackFindingAlgorithm.cpp
         MyTrackWriter.cpp
         MyFtdGeo.cxx
+        MyFtdDetector.cpp
+        BaseTpcSectorGeo.cxx
         )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
@@ -72,19 +87,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
         ActsExamplesIoHepMC3
         ActsExamplesAmbiguityResolution
         tbb
-        Core
-        MathCore
-        Tree
-        RIO
         ${Geant4_LIBRARIES}
+        ${ROOT_LIBRARIES}
 )
-
-# copy run macros
-set(SCRIPTS
-        )
-
-foreach (_script ${SCRIPTS})
-    configure_file(${_script}
-            ${PROJECT_BINARY_DIR}/${_script}
-            COPYONLY)
-endforeach ()

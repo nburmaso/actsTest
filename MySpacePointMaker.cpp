@@ -48,18 +48,26 @@ ActsExamples::MySpacePointMaker::MySpacePointMaker(Config cfg, Acts::Logging::Le
   };
 
   auto spBuilderConfig = Acts::SpacePointBuilderConfig();
-  spBuilderConfig.trackingGeometry = m_cfg.trackingGeometry;
-  m_slSurfaceAccessor.emplace(IndexSourceLink::SurfaceAccessor{*m_cfg.trackingGeometry});
+  spBuilderConfig.trackingGeometry = m_cfg.detector->GetTrackingGeometry();
+  m_slSurfaceAccessor.emplace(IndexSourceLink::SurfaceAccessor{*spBuilderConfig.trackingGeometry});
   spBuilderConfig.slSurfaceAccessor.connect<&IndexSourceLink::SurfaceAccessor::operator()>(&m_slSurfaceAccessor.value());
   m_spacePointBuilder = Acts::SpacePointBuilder<SimSpacePoint>(spBuilderConfig, spConstructor, Acts::getDefaultLogger("SpacePointBuilder", lvl));
 }
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "misc-no-recursion"
 ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const AlgorithmContext& ctx) const {
+  using ISL = IndexSourceLink;
+  using FtdLayerTypes = MyFtdGeo::FtdLayerTypes;
+
+  std::shared_ptr<MyFtdGeo> ftdGeo = m_cfg.detector->FtdGeo();
+  std::shared_ptr<MyFtdDetector> det = m_cfg.detector;
+
   const auto& measurements = m_inputMeasurements(ctx);
 
   // function to access measurement parameters using source links
   auto accessor = [&measurements](Acts::SourceLink slink) {
-    const auto islink = slink.get<IndexSourceLink>();
+    const auto islink = slink.get<ISL>();
     const ConstVariableBoundMeasurementProxy meas = measurements.getMeasurement(islink.index());
     return std::make_pair(meas.fullParameters(), meas.fullCovariance());
   };
@@ -69,117 +77,121 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   std::vector<std::pair<Acts::SourceLink, std::pair<Acts::Vector3, Acts::Vector3>>> backStrips;
   std::vector<Acts::SourceLink> twoDimMeasurements;
 
-  int shift = 3; // FIXME
-  int nStations = 5; // TODO read from config
-//  std::list<std::vector<ActsExamples::IndexSourceLink>> candidates[nStations];
+  int nStations = ftdGeo->GetNumberOfStations();
+  int nLayPerSt = ftdGeo->GetNLayersPerStation();
+  int nLayers = ftdGeo->GetNumberOfLayers();
+
+  std::vector<std::list<ISL>> mesPerLay(nLayers);
+  for (auto& isl : measurements.orderedIndices()) {
+    const auto geoId = isl.geometryId();
+    int iLayer = det->GeoIdToFtdLayer(geoId);
+    mesPerLay[iLayer].emplace_back(isl);
+  }
+
+  for (int iL = 0; iL < nLayers; ++iL) {
+    auto& mesList = mesPerLay[iL];
+    mesList.sort([](const ISL& a, const ISL& b) { return a.geometryId() < b.geometryId(); });
+  }
+
+  int maxDeltaStrawId = m_cfg.maxDeltaStrawId;
+  int minMeasPerCand = m_cfg.minMeasPerCand;
+
+  // iterate through layer measurements recursively
+  auto constructCands = [&](auto&& self,
+                            int layerId,
+                            int station,
+                            std::list<Candidate>& cands,
+                            Candidate& cand,
+                            ISL const* prevIsl) -> void
+  {
+    // reached end of layers or another station -> store completed candidate
+    if (ftdGeo->GetLayerStation(layerId) != station || layerId >= nLayers) {
+      if (cand.sourceLinks.size() >= minMeasPerCand)
+        cands.emplace_back(cand);
+      return;
+    }
+
+    // skip fake pixel layers
+    if (ftdGeo->GetLayerType(layerId) == FtdLayerTypes::kPixel) {
+      self(self, layerId + 1, station, cands, cand, prevIsl);
+      return;
+    }
+
+    auto& curLayerList = mesPerLay[layerId];
+
+    if (prevIsl == nullptr) {
+      // first layer we touch for this candidate -> try all measurements on this layer
+      for (ISL& isl : curLayerList) {
+        cand.sourceLinks.push_back(isl);
+        self(self, layerId + 1, station, cands, cand, &cand.sourceLinks.back());
+        cand.sourceLinks.pop_back(); // go back
+      }
+    } else {
+      // iterate measurements in vicinity: [centerStrawId - maxDeltaStrawId, centerStrawId + maxDeltaStrawId]
+      auto centerStrawId = prevIsl->geometryId().sensitive();
+      auto it = curLayerList.begin();
+      while (it != curLayerList.end() && it->geometryId().sensitive() < centerStrawId - maxDeltaStrawId) {
+        ++it;
+      }
+      for (; it != curLayerList.end(); ++it) {
+        auto strawId = it->geometryId().sensitive();
+        if (strawId > centerStrawId + maxDeltaStrawId)
+          break;
+        cand.sourceLinks.push_back(*it);
+        self(self, layerId + 1, station, cands, cand, &cand.sourceLinks.back());
+        cand.sourceLinks.pop_back(); // go back
+      }
+    }
+  };
+
+  // construct straw spacepoints
   std::list<Candidate> candidates[nStations];
-  std::list<Candidate>::iterator candIt;
-  double rMax = 1300; // FIXME Extract from surface dimensions
+  for (int iL = 0; iL < nLayers; ++iL) {
+    int layerType = ftdGeo->GetLayerType(iL);
+    if (layerType == FtdLayerTypes::kPixel) continue;
+    int station = ftdGeo->GetLayerStation(iL);
+    // if (station > 0) continue;
+    auto& candList = candidates[station];
+    Candidate cand;  // starts empty
+    cand.station = station;
+    constructCands(constructCands, iL, station, candList, cand, nullptr);
+  }
+
+  // construct everything else
+  double rMax = ftdGeo->GetLayerRMax(ftdGeo->GetNumberOfLayers()-1);
   for (auto& isl : measurements.orderedIndices()) {
     const auto geoId = isl.geometryId();
     const auto volumeId = geoId.volume();
     const auto layerId = geoId.layer();
-    int iStation = (layerId-shift)/7;
-    int iLayer = (layerId-shift)%7;
+    int iLayer = det->GeoIdToFtdLayer(geoId);
+    int iStation = ftdGeo->GetLayerStation(iLayer);
     Acts::SourceLink slink{isl};
-
-    if ((layerId-shift)%7==3 || layerId==2 || layerId==38) {
-    // if (layerType[layerId - shift]==2) {
+    int layerType = ftdGeo->GetLayerType(iLayer);
+    if (layerType == FtdLayerTypes::kPixel) {
       twoDimMeasurements.emplace_back(slink);
-    } else if (0){
+    } else if (0) {
       const auto [par, cov] = accessor(slink);
-      const Acts::Surface* surface = m_slSurfaceAccessor.value()(slink);
+      const Acts::Surface *surface = m_slSurfaceAccessor.value()(slink);
       // TODO: more realistic strip dimensions including inner radii and half-station splitting
-      auto gpos1 = surface->localToGlobal(ctx.geoContext, Acts::Vector2(par[0],-rMax), Acts::Vector3());
+      auto gpos1 = surface->localToGlobal(ctx.geoContext, Acts::Vector2(par[0], -rMax), Acts::Vector3());
       auto gpos2 = surface->localToGlobal(ctx.geoContext, Acts::Vector2(par[0], rMax), Acts::Vector3());
-      if (layerId%4==2) {
-        frontStrips.emplace_back(std::make_pair(slink, std::make_pair(gpos1, gpos2)));
-      } else if (layerId%4==0) {
-        backStrips.emplace_back(std::make_pair(slink, std::make_pair(gpos1, gpos2)));
-      }
-    } else {
-      if (iStation>0) continue;
-      int iStraw = geoId.sensitive();
-      ACTS_DEBUG("iLayer=" << iLayer << " iStraw=" << iStraw);
-      const auto [par, cov] = accessor(slink);
-      const Acts::Surface* surface = m_slSurfaceAccessor.value()(slink);
-      auto xyz = surface->localToGlobal(ctx.geoContext, Acts::Vector2(par[0],0), Acts::Vector3());
-      ACTS_DEBUG("iLayer=" << iLayer << " iStraw=" << iStraw << " x=" << xyz[0] << " y=" << xyz[1]);
-      // construct sp candidates as vectors of index source links from the same station corresponding to
-      // straws with similar straw ids (~similar angles)
-      for (candIt = candidates[iStation].begin(); candIt!=candidates[iStation].end(); ++candIt){
-      //for (auto& candidate : candidates[iStation]){
-        Candidate& candidate = *candIt;
-        bool isCompatibleCandidate = 1;
-        ACTS_DEBUG(" Checking candidate");
-        for (auto& isl2 : candidate.sourceLinks){
-          const auto geoId2 = isl2.geometryId();
-          int iLayer2 = (geoId2.layer()-shift)%7;
-          int iStraw2 = geoId2.sensitive();
-          ACTS_DEBUG("    Checking iLayer2=" << iLayer2 << " iStraw2=" << iStraw2);
-          int layerDif = iLayer - iLayer2;
-          int strawDif = iStraw - iStraw2;
-          if (layerDif<=0) { isCompatibleCandidate = 0; break ; } // should be imposible by construction
-          if (layerDif==4) { // same direction
-            if (strawDif<-1 || strawDif>0) { isCompatibleCandidate = 0; break ; }
-          } else if (layerDif==1){
-            if ((iLayer2==0 || iLayer2==4) && (strawDif<-2 || strawDif>3)) { isCompatibleCandidate = 0; break ; };
-            if ((iLayer2==1 || iLayer2==5) && (strawDif<-6 || strawDif>4)) { isCompatibleCandidate = 0; break ; };
-          } else if (layerDif==2){
-            if ((iLayer2==0 || iLayer2==4) && (strawDif<-4 || strawDif>2)) { isCompatibleCandidate = 0; break ; };
-            if ((iLayer2==2) && (strawDif<-4 || strawDif>2)) { isCompatibleCandidate = 0; break ; };
-          } else if (layerDif==3){
-            if ((iLayer2==1) && (strawDif<-2 || strawDif>3)) { isCompatibleCandidate = 0; break ; };
-            if ((iLayer2==2) && (strawDif<-6 || strawDif>4)) { isCompatibleCandidate = 0; break ; };
-          } else if (layerDif==5){
-            if ((iLayer2==0) && (strawDif<-2 || strawDif>3)) { isCompatibleCandidate = 0; break ; };
-            if ((iLayer2==1) && (strawDif<-6 || strawDif>4)) { isCompatibleCandidate = 0; break ; };
-          } else if (layerDif==6){
-            if ((iLayer2==0) && (strawDif<-4 || strawDif>2)) { isCompatibleCandidate = 0; break ; };
-          }
-        }
-        if (!isCompatibleCandidate) continue;
-        // ACTS_DEBUG("Copy existing candidate");
-        // candidates[iStation].insert(candIt, *candIt);
-        ACTS_DEBUG("Adding new measurement to existing candidate");
-        candidate.sourceLinks.push_back(isl);
-      }
-      if (iLayer==0 || iLayer==1 || iLayer==2 || iLayer==4){
-        std::vector<ActsExamples::IndexSourceLink> new_candidate;
-        new_candidate.push_back(isl);
-        candidates[iStation].emplace_back(new_candidate,iStation);
-        ACTS_DEBUG("Adding new candidate");
+      if (layerId % 4 == 2) {
+        frontStrips.emplace_back(slink, std::make_pair(gpos1, gpos2));
+      } else if (layerId % 4 == 0) {
+        backStrips.emplace_back(slink, std::make_pair(gpos1, gpos2));
       }
     }
   }
 
-  for (int iStation=0;iStation<nStations;iStation++) {
-    ACTS_DEBUG("Station " << iStation << ": number of candidates " << candidates[iStation].size());    
-    // for (auto candidate : candidates[iStation]) {
-    for (auto it = candidates[iStation].begin(); it != candidates[iStation].end();) {
-      auto& candidate = *it;
-      ACTS_DEBUG("  candidate.size=" << candidate.sourceLinks.size());
-      for (auto& isl : candidate.sourceLinks) {
-        ACTS_DEBUG("   layer=" << (isl.geometryId().layer()-shift)%7 << " straw=" << isl.geometryId().sensitive());
-      }
-      if (candidate.sourceLinks.size()<3) {
-        ACTS_DEBUG(  "erasing...");
-        it = candidates[iStation].erase(it);
-      } else {
-        it++;
-      }
-    }
-  }
   // return ActsExamples::ProcessCode::SUCCESS;
   ACTS_DEBUG("making space points from straws");
-
 
   SimSpacePointContainer spacePoints;
 
   std::vector<double> c;
   std::vector<double> s;
   std::vector<double> z;
-  std::vector<double> g;      
+  std::vector<double> g;
   std::vector<double> d;
 
   for (int iStation=0;iStation<nStations;iStation++) {
@@ -209,7 +221,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
         double y = xyz[1];
         double cosp = rot(0,1);
         double sinp = rot(0,0);
-        
+
         z[i] = xyz[2];
         s[i] = z[i]*sinp;
         c[i] = z[i]*cosp;
@@ -262,7 +274,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       i++;
     }
 
-    ACTS_DEBUG("Info on shared measurements...");        
+    ACTS_DEBUG("Info on shared measurements...");
     for (int i=0;i<selectedCandidates.size();i++){
       auto& candidate = selectedCandidates[i];
       for (auto& isl : candidate.sourceLinks){
@@ -307,7 +319,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       }
       selectedCandidateIds.erase(badCandidate);
     }
-    ACTS_DEBUG("Selected candidates...");        
+    ACTS_DEBUG("Selected candidates...");
     for (auto& id : selectedCandidateIds) {
       auto& sp = selectedCandidates[id];
       // TODO read from config
@@ -472,13 +484,13 @@ double ActsExamples::MySpacePointMaker::analytic(std::vector<double> &a, std::ve
     dtdc[i] = vt[i];
     for (int j=0; j<n; j++){
       dtdc[i] += g[j]*dtdk[j]*dkdc[i];
-    }  
+    }
 
     dt2+=s[i]*s[i]*dtdc[i]*dtdc[i];
   }
 
   dt = sqrt(dt2);
-  
+
   double chi2 = 0;
   for (int i=0;i<n;i++){
     double d = a[i]*t*cosa + b[i]*t*sina + g[i];
@@ -488,12 +500,12 @@ double ActsExamples::MySpacePointMaker::analytic(std::vector<double> &a, std::ve
 }
 
 double ActsExamples::MySpacePointMaker::helix(
-  std::vector<double> &z, std::vector<double> &s, std::vector<double> &c, std::vector<double> &g, 
-  std::vector<double> &d, double &tx, double &ty, double &p, bool debug) const 
+  std::vector<double> &z, std::vector<double> &s, std::vector<double> &c, std::vector<double> &g,
+  std::vector<double> &d, double &tx, double &ty, double &p, bool debug) const
 {
   int n = s.size();
-  double sk[n]={0};
-  double ck[n]={0};  
+  std::vector<double> sk(n, 0.);
+  std::vector<double> ck(n, 0.);
   auto fk = [&n,&s,&c,&z,&g,&tx,&ty,&sk,&ck](double k) {
     double ss = 0;
     double sc = 0;
@@ -518,7 +530,7 @@ double ActsExamples::MySpacePointMaker::helix(
     }
     return sum;
   };
-  
+
   double f0 = fk(0);
   double dk = 1e-7;
   double dfdk = (fk(dk)-f0)/dk;
@@ -526,7 +538,7 @@ double ActsExamples::MySpacePointMaker::helix(
   double kmin = kk>0 ? 0  : kk;
   double kmax = kk>0 ? kk :  0;
   // printf("%f %f %f %f\n",kmin, kmax, fk(kmin), fk(kmax));
-  
+
   ROOT::Math::Functor1D functor(fk);
   ROOT::Math::RootFinder rf(ROOT::Math::RootFinder::kGSL_BISECTION);
   rf.SetFunction(functor, kmin, kmax);
