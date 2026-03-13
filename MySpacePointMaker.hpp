@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "MyFtdDetector.h"
+
 namespace Acts {
 class TrackingGeometry;
 }
@@ -25,8 +27,10 @@ class MySpacePointMaker final : public IAlgorithm {
   struct Config {
     std::string inputMeasurements;
     std::string outputSpacePoints;
-    std::shared_ptr<const Acts::TrackingGeometry> trackingGeometry;
+    std::shared_ptr<MyFtdDetector> detector{nullptr};
     std::vector<Acts::GeometryIdentifier> geometrySelection;
+    int maxDeltaStrawId{6};
+    int minMeasPerCand{3};
   };
 
   struct Candidate {

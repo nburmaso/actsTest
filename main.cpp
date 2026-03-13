@@ -30,16 +30,17 @@
 #include "ActsExamples/TruthTracking/TruthSeedingAlgorithm.hpp"
 #include "ActsExamples/AmbiguityResolution/GreedyAmbiguityResolutionAlgorithm.hpp"
 
-//#include "MyTrackFindingAlgorithm.hpp"
+// #include "MyTrackFindingAlgorithm.hpp"
 #include "MyTrackWriter.hpp"
-//#include "tracker_config.h"
 #include "TString.h"
 #include <filesystem>
 
 #include "MySpacePointMaker.hpp"
 #include "MyRefittingAlgorithm.hpp"
 #include "MyDigitizationAlgorithm.hpp"
-#include "tracker.h"
+// #include "tracker.h"
+
+#include "MyFtdDetector.h"
 
 using Acts::UnitConstants::cm;
 using namespace Acts::UnitConstants;
@@ -172,8 +173,14 @@ int main(int argc, char *argv[]){
   particleReaderCfg.treeName = "particles";
   particleReaderCfg.filePath = TString(inputDir+"particles.root").Data();
 
-  auto trackingGeometryPtr = CreateTrackingGeometry(isroc, isframe);
-  auto trackingGeometry = std::make_shared<Acts::TrackingGeometry>(*trackingGeometryPtr);
+  auto detector = std::make_shared<MyFtdDetector>();
+  std::shared_ptr<const Acts::TrackingGeometry> trackingGeometry = detector->GetTrackingGeometry(true, isroc, isframe, false);
+  std::shared_ptr<MyFtdGeo> ftdGeo = detector->FtdGeo();
+  const auto& surfaceByIdentifier = trackingGeometry->geoIdSurfaceMap();
+
+  // Magnetic field
+  double bz = ftdGeo->GetField() * Acts::UnitConstants::T;
+  auto magField = std::make_shared<Acts::ConstantBField>(Acts::Vector3(0.0, 0.0, bz));
 
   // Fatras config
   ActsExamples::FatrasSimulation::Config fatrasCfg;
@@ -182,7 +189,7 @@ int main(int argc, char *argv[]){
   fatrasCfg.outputSimHits = simhits;
   fatrasCfg.trackingGeometry = trackingGeometry;
   fatrasCfg.pMin = 0.1_GeV;
-  fatrasCfg.magneticField = std::make_shared<Acts::ConstantBField>(Acts::Vector3(0.0, 0.0, bz*Acts::UnitConstants::T));
+  fatrasCfg.magneticField = magField;
   fatrasCfg.randomNumbers = rnd;
 
   int shift = 2;
@@ -198,13 +205,22 @@ int main(int argc, char *argv[]){
   digiConfig.smearingDigiConfig.params.push_back(ActsExamples::ParameterSmearingConfig{Acts::eBoundLoc1, ActsExamples::Digitization::Gauss(0.1)});
 
   std::vector<std::pair<Acts::GeometryIdentifier, ActsExamples::DigiComponentsConfig>> elements;
-  for (int l=0; l<positions.size(); l++) {
-    if (layerType[l]==2) {
-      elements.push_back( {Acts::GeometryIdentifier().withVolume(1).withLayer(l+shift), digiConfig} );
-    } else {
-      elements.push_back( {Acts::GeometryIdentifier().withVolume(1).withLayer(l+shift), stripConfig} );
+
+  for (auto surfId : surfaceByIdentifier) {
+    auto id = surfId.first;
+    const auto* detEl = dynamic_cast<const MyDetectorElement*>(surfId.second->associatedDetectorElement());
+    if (detEl == nullptr)
+      continue;
+    if (detEl->name().find("FTD") != std::string::npos) {
+      auto layer = dynamic_cast<const MyFtdDetectorElement*>(detEl)->layer();
+      if (ftdGeo->GetLayerType(layer)==MyFtdGeo::FtdLayerTypes::kPixel) {
+        elements.emplace_back(id, digiConfig);
+      } else {
+        elements.emplace_back(id, stripConfig);
+      }
     }
   }
+
   // std::vector<std::pair<Acts::GeometryIdentifier, ActsExamples::DigiComponentsConfig>> elements = { {Acts::GeometryIdentifier{}, digiConfig} };
 
   // Digitization config
@@ -215,7 +231,7 @@ int main(int argc, char *argv[]){
   digiCfg.outputMeasurements = measurements;
   digiCfg.outputMeasurementParticlesMap = measurement_particles_map;
   digiCfg.outputMeasurementSimHitsMap = measurement_simhits_map;
-  digiCfg.surfaceByIdentifier = trackingGeometry->geoIdSurfaceMap();
+  digiCfg.surfaceByIdentifier = surfaceByIdentifier;
   digiCfg.digitizationConfigs = Acts::GeometryHierarchyMap<ActsExamples::DigiComponentsConfig>(elements);
 
   // // Create space points
@@ -232,7 +248,9 @@ int main(int argc, char *argv[]){
   // Create space points
   ActsExamples::MySpacePointMaker::Config spCfg;
   spCfg.inputMeasurements = measurements;
-  spCfg.trackingGeometry = trackingGeometry;
+  spCfg.detector = detector;
+  spCfg.maxDeltaStrawId = 6;
+  spCfg.minMeasPerCand = 3;
   spCfg.outputSpacePoints = spacepoints;
   spCfg.geometrySelection = {Acts::GeometryIdentifier{}};
 
@@ -251,6 +269,8 @@ int main(int argc, char *argv[]){
   //int iB = 3, iM = 17, iF = 31;
   //int iB = 4, iM = 6, iF = 8;
   //int iB = 0, iM = 2, iF = 4;
+  double rMaxStation = ftdGeo->GetLayerRMax(ftdGeo->GetNumberOfLayers()-1);
+  auto positions = ftdGeo->GetLayerPositions();
   ActsExamples::SeedingAlgorithm::Config seedingCfg;
   seedingCfg.inputSpacePoints = {spacepoints};
   seedingCfg.outputSeeds = seeds;
@@ -260,12 +280,12 @@ int main(int argc, char *argv[]){
   seedingCfg.seedFinderConfig.deltaRMax          = (1-positions[iM]/positions[iF])*rMaxStation*cm + 1_mm;
   seedingCfg.seedFinderConfig.zMin               = positions[iB]*cm - 1_mm;
   seedingCfg.seedFinderConfig.zMax               = positions[iF]*cm + 1_mm;
-  seedingCfg.seedFinderConfig.rMin               = layerRMin[iB]*cm;
-  seedingCfg.seedFinderConfig.rMax               = layerRMax[iF]*cm;
-  seedingCfg.seedFinderConfig.rMinMiddle         = layerRMin[iM]*cm;
-  seedingCfg.seedFinderConfig.rMaxMiddle         = layerRMax[iM]*cm;
+  seedingCfg.seedFinderConfig.rMin               = ftdGeo->GetLayerRMin(iB)*cm;
+  seedingCfg.seedFinderConfig.rMax               = ftdGeo->GetLayerRMax(iF)*cm;
+  seedingCfg.seedFinderConfig.rMinMiddle         = ftdGeo->GetLayerRMin(iM)*cm;
+  seedingCfg.seedFinderConfig.rMaxMiddle         = ftdGeo->GetLayerRMax(iM)*cm;
   seedingCfg.seedFinderConfig.cotThetaMax        = 7.0;  
-  seedingCfg.seedFinderConfig.impactMax          = layerRMin[iB]*cm - 10_mm;
+  seedingCfg.seedFinderConfig.impactMax          = ftdGeo->GetLayerRMin(iB)*cm - 10_mm;
   seedingCfg.seedFinderConfig.collisionRegionMin = -vzMax*cm; // important at low momenta due to mult scattering effects
   seedingCfg.seedFinderConfig.collisionRegionMax = +vzMax*cm; // important at low momenta due to mult scattering effects
   seedingCfg.seedFinderConfig.radLengthPerSeed   = radLengthPerSeed;
@@ -302,7 +322,7 @@ int main(int argc, char *argv[]){
   std::vector<std::pair<Acts::GeometryIdentifier, Acts::MeasurementSelectorCuts>> measSel;
 
   for (int l = 0; l < positions.size(); ++l) {
-    double chi2 = layerType[l]==2 ? -1 : 10; // std::numeric_limits<double>::max();
+    double chi2 = ftdGeo->GetLayerType(l)==MyFtdGeo::FtdLayerTypes::kPixel ? -1 : 10; // std::numeric_limits<double>::max();
     measSel.emplace_back(Acts::GeometryIdentifier().withVolume(1).withLayer(l+shift).withSensitive(0), Acts::MeasurementSelectorCuts({}, {chi2}, {2u}));
   }
   // trackFindingCfg.measurementSelectorCfg = {{Acts::GeometryIdentifier(), {{}, {std::numeric_limits<double>::max()}, {1u}}}}; // chi2cut, numberOfMeasurementsPerSurface
