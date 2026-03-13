@@ -213,7 +213,7 @@ int main(int argc, char *argv[]){
       continue;
     if (detEl->name().find("FTD") != std::string::npos) {
       auto layer = dynamic_cast<const MyFtdDetectorElement*>(detEl)->layer();
-      if (ftdGeo->GetLayerType(layer)==2) {
+      if (ftdGeo->GetLayerType(layer)==MyFtdGeo::FtdLayerTypes::kPixel) {
         elements.emplace_back(id, digiConfig);
       } else {
         elements.emplace_back(id, stripConfig);
@@ -322,7 +322,7 @@ int main(int argc, char *argv[]){
   std::vector<std::pair<Acts::GeometryIdentifier, Acts::MeasurementSelectorCuts>> measSel;
 
   for (int l = 0; l < positions.size(); ++l) {
-    double chi2 = ftdGeo->GetLayerType(l)==2 ? -1 : 10; // std::numeric_limits<double>::max();
+    double chi2 = ftdGeo->GetLayerType(l)==MyFtdGeo::FtdLayerTypes::kPixel ? -1 : 10; // std::numeric_limits<double>::max();
     measSel.emplace_back(Acts::GeometryIdentifier().withVolume(1).withLayer(l+shift).withSensitive(0), Acts::MeasurementSelectorCuts({}, {chi2}, {2u}));
   }
   // trackFindingCfg.measurementSelectorCfg = {{Acts::GeometryIdentifier(), {{}, {std::numeric_limits<double>::max()}, {1u}}}}; // chi2cut, numberOfMeasurementsPerSurface
