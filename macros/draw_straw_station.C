@@ -77,7 +77,7 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 0, bool dra
     }
   }
 
-  TFile* fMeas = new TFile("../build/test/measurements.root");
+  TFile* fMeas = new TFile(dir+"measurements.root");
   TTree* tMeas = (TTree*) fMeas->Get("measurements");
   tMeas->Print();
   int32_t m_event_id;
@@ -135,7 +135,7 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 0, bool dra
   for (int ih=0;ih<tHits->GetEntries();ih++){
     tHits->GetEntry(ih);
     if (selected_event>=0 && event_id!=selected_event) continue;
-    if (fabs(tz/10-lz)>20) continue;
+    if (fabs(tz/10-lz)>2) continue;
     printf("%f\n",tz);
     g->AddPoint(tx/10,ty/10);
   }
@@ -168,7 +168,7 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 0, bool dra
       auto geoId = Acts::GeometryIdentifier(sgeometry_id);
       int layerActs = geoId.layer();
       int surfaceActs = geoId.sensitive();
-      if (fabs(sz/10-lz)>20) continue;
+      if (fabs(sz/10-lz)>2) continue;
 
 //      if (surfaceActs==1) continue;
       gSP->AddPoint(sx/10.,sy/10.);
