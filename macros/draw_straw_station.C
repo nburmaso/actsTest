@@ -17,16 +17,18 @@
 #include "../MyFtdGeo.h"
 using namespace std;
 
-void draw_straw_station(int selected_event = 0, int selected_layer = 0, bool draw_spacepoints = 1, bool zoom = 0){
+// set layer corresponding to fake surface in the middle of the station
+void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool draw_spacepoints = 1, bool zoom = 0){
   TString dir = "../build/test";
   dir.Append("/");
 
   MyFtdGeo fg;
   double incl = fg.GetTubeIncl();
-  double rmin = fg.GetLayerRMin(selected_layer+2);
-  double rmax = fg.GetLayerRMax(selected_layer+2);
+  double rmin = fg.GetLayerRMin(selected_layer);
+  double rmax = fg.GetLayerRMax(selected_layer);
   double dr = (rmax-rmin)/2.;
   double rc = (rmin+rmax)/2.;
+  double lz = fg.GetLayerPositions()[selected_layer];
 
   // new TCanvas("cmeas","cmeas",1320,1320);
   new TCanvas("cmeas","cmeas",850,850);
@@ -49,7 +51,7 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 0, bool dra
   using std::numbers::pi;
 
   std::map<int, TPolyLine*> mapPolyLines[7];
-  for (int layerId=selected_layer+1; layerId<selected_layer+8; layerId++){
+  for (int layerId=selected_layer-3; layerId<=selected_layer+3; layerId++){
     int layerType = fg.GetLayerType(layerId);
     if (layerType == 2) continue;
     bool back = ((layerId-1)%7)/3>0;
@@ -79,7 +81,7 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 0, bool dra
 
   TFile* fMeas = new TFile(dir+"measurements.root");
   TTree* tMeas = (TTree*) fMeas->Get("measurements");
-  tMeas->Print();
+  // tMeas->Print();
   int32_t m_event_id;
   int32_t m_volume_id;
   int32_t m_layer_id;
@@ -96,10 +98,9 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 0, bool dra
   for (int im=0; im<tMeas->GetEntries(); im++){
     tMeas->GetEntry(im);
     if (selected_event>=0 && m_event_id!=selected_event) continue;
-    if (m_layer_id-3>selected_layer+6) continue;
-    // if (m_layer_id-2>6) continue;
     int layerType = fg.GetLayerType(m_layer_id-2);
     if (layerType == 2) continue;
+    if (fabs(m_true_z/10-lz)>3) continue;
     printf("%d %d\n",m_layer_id,m_surface_id);
     auto pline = mapPolyLines[(m_layer_id-2)%7][m_surface_id-1];
     pline->SetLineWidth(2);
@@ -131,7 +132,6 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 0, bool dra
   tHits->SetBranchAddress("tz",&tz);
   
   TGraph* g = new TGraph();
-  double lz = fg.GetLayerPositions()[selected_layer+2];
   for (int ih=0;ih<tHits->GetEntries();ih++){
     tHits->GetEntry(ih);
     if (selected_event>=0 && event_id!=selected_event) continue;

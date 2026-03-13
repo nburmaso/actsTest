@@ -4,10 +4,11 @@
 #include "style.h"
 #include "../MyFtdGeo.h"
 // for single-track events only
-void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected_layer = 0){
+//void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected_layer = 4){
+void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected_layer = 4){
   dir.Append("/");
   MyFtdGeo fg;
-  double lz = fg.GetLayerPositions()[selected_layer+2];
+  double lz = fg.GetLayerPositions()[selected_layer];
 
   TFile* fPart = new TFile(dir + "particles.root");
   TTree* tPart = (TTree*) fPart->Get("particles");
@@ -28,10 +29,12 @@ void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected
   tMeas->SetBranchAddress("true_loc0",&m_true_loc0);
   tMeas->SetBranchAddress("true_z",&m_true_z);
   
-  vector<double> vn(nEvents,0);
+  vector<int> vn(nEvents,0);
   for (int im=0; im<tMeas->GetEntries(); im++){
     tMeas->GetEntry(im);
-    if (fabs(m_true_z/10-lz)>2.1) continue;
+    int layerType = fg.GetLayerType(m_layer_id-2);
+    if (layerType == 2) continue;
+    if (fabs(m_true_z/10-lz)>3.1) continue;
     vn[m_event_id]++;
   }
 
@@ -53,7 +56,7 @@ void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected
 
   for (int ih=0;ih<tHits->GetEntries();ih++){
     tHits->GetEntry(ih);
-    if (fabs(tz/10-lz)>2) continue;
+    if (fabs(tz/10-lz)>1) continue;
     vx[event_id] = tx;
     vy[event_id] = ty;
   }
@@ -74,9 +77,17 @@ void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected
   TH2D* hXY = new TH2D("hXY","",260,-1300,1300,260,-1300,1300);  
   TH2D* hDxDy = new TH2D("hDxDy","",100,-10,10,100,-10,10);  
   TH1D* hDr = new TH1D("hDr","",100,-10,10);  
+  TH1D* hDr3 = new TH1D("hDr3","",100,-10,10);  
+  TH1D* hDr4 = new TH1D("hDr4","",100,-10,10);  
+  TH1D* hDr5 = new TH1D("hDr5","",100,-10,10);
+  
+  TH1D* hDp = new TH1D("hDp","",100,-2,2);    
+  TH1D* hDp3 = new TH1D("hDp3","",100,-2,2);    
+  TH1D* hDp4 = new TH1D("hDp4","",100,-2,2);    
+  TH1D* hDp5 = new TH1D("hDp5","",100,-2,2);    
   for (int is=0;is<tSpacepoints->GetEntries();is++){
     tSpacepoints->GetEntry(is);
-    if (fabs(sz/10-lz)>2) continue;
+    if (fabs(sz/10-lz)>1) continue;
     double hx = vx[sevent_id];
     double hy = vy[sevent_id];    
     double dx = sx - hx;
@@ -84,23 +95,49 @@ void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected
     double sr = sqrt(sx*sx+sy*sy);
     double hr = sqrt(hx*hx+hy*hy);    
     double dr = sr - hr;
+    double dp = hr*(atan2(sy,sx)-atan2(hy,hx));
+    // if (fabs(sy)>100) continue;
+    // if (sx<0) continue;
     hDr->Fill(dr);
-    if (fabs(sy)>100) continue;
-    if (sx<0) continue;
+    hDp->Fill(dp);
+    if (vn[sevent_id]==3) hDr3->Fill(dr);
+    if (vn[sevent_id]==4) hDr4->Fill(dr);    
+    if (vn[sevent_id]==5) hDr5->Fill(dr);
+
+    if (vn[sevent_id]==3) hDp3->Fill(dp);
+    if (vn[sevent_id]==4) hDp4->Fill(dp);    
+    if (vn[sevent_id]==5) hDp5->Fill(dp);
+
     hXY->Fill(sx,sy);
     hDxDy->Fill(dx,dy);
+    if (fabs(dp)<0.1) printf("event=%d n=%d\n",sevent_id,vn[sevent_id]);
   }
+
+  TH1D* hN = new TH1D("hN","",10,0,10);
+  for (int ev=0;ev<vn.size();ev++){
+    hN->Fill(vn[ev]);
+  }
+  new TCanvas;
+  hN->Draw();
 
   hXY->Draw();
   new TCanvas;
   hDxDy->Draw();
   new TCanvas;
   hDr->Draw();
-
+  hDr3->SetLineColor(kRed);
+  hDr4->SetLineColor(kMagenta);
+  hDr5->SetLineColor(kBlue);  
+  hDr3->Draw("same");
+  hDr4->Draw("same");
+  hDr5->Draw("same");
   new TCanvas;
-  TH1D* hN = new TH1D("hN","",10,0,10);
-  for (int ev=0;ev<vn.size();ev++){
-    hN->Fill(vn[ev]);
-  }
-  hN->Draw();
+  hDp->Draw();
+  hDp3->SetLineColor(kRed);
+  hDp4->SetLineColor(kMagenta);
+  hDp5->SetLineColor(kBlue);  
+  hDp3->Draw("same");
+  hDp4->Draw("same");
+  hDp5->Draw("same");
+  hDp4->Fit("gaus","","",-0.2,0.2);
 }
