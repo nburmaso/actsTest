@@ -211,7 +211,7 @@ std::shared_ptr<Acts::TrackingVolume> MyFtdDetector::CreateFTD(bool isPos, bool 
       if (fFtdGeo->GetLayerType(i)==6) angleRot = -fFtdGeo->GetTubeIncl();
       double rc = 0.5 * (rmax + rmin);
       double hl = 0.5 * (rmax - rmin) / cos(angleRot);
-      double hw = fFtdGeo->GetLayerStripWidth(i) * cm;
+      double hw = 0.5 * fFtdGeo->GetLayerStripWidth(i) * cm;
       const auto sBounds = std::make_shared<const Acts::RectangleBounds>(hw, hl);
       int nTubes = fFtdGeo->GetLayerNumberOfTubes(i);
       std::vector<std::shared_ptr<const Acts::Surface>> vSurfaces;
