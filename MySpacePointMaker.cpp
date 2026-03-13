@@ -141,6 +141,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
         self(self, layerId + 1, station, cands, cand, &cand.sourceLinks.back());
         cand.sourceLinks.pop_back(); // go back
       }
+      self(self, layerId + 1, station, cands, cand, prevIsl);
     }
   };
 
