@@ -18,8 +18,8 @@
 using namespace std;
 
 // set layer corresponding to fake surface in the middle of the station
-void draw_straw_station(int selected_event = 9973, int selected_layer = 4, bool draw_spacepoints = 1, bool zoom = 0){
-  TString dir = "../build/test02";
+void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool draw_spacepoints = 1, bool zoom = 0){
+  TString dir = "../build/test";
   dir.Append("/");
 
   MyFtdGeo fg;
@@ -132,10 +132,12 @@ void draw_straw_station(int selected_event = 9973, int selected_layer = 4, bool 
   tHits->SetBranchAddress("tz",&tz);
   
   TGraph* g = new TGraph();
+  TGraph* gh = new TGraph();  
   for (int ih=0;ih<tHits->GetEntries();ih++){
     tHits->GetEntry(ih);
     if (selected_event>=0 && event_id!=selected_event) continue;
     if (fabs(tz/10-lz)>2) continue;
+    if (fabs(tz/10-lz)<0.01) gh->AddPoint(tx/10,ty/10);
     printf("%f\n",tz);
     g->AddPoint(tx/10,ty/10);
   }
@@ -144,7 +146,10 @@ void draw_straw_station(int selected_event = 9973, int selected_layer = 4, bool 
   g->SetMarkerStyle(kFullCircle);
   g->SetMarkerSize(1.);
   g->Draw("p");
-
+  gh->SetMarkerStyle(kFullCircle);
+  gh->SetMarkerSize(1.);
+  gh->SetMarkerColor(kGreen);
+  gh->Draw("p");
 
   float sx;
   float sy;

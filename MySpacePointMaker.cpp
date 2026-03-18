@@ -151,7 +151,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     int layerType = ftdGeo->GetLayerType(iL);
     if (layerType == FtdLayerTypes::kPixel) continue;
     int station = ftdGeo->GetLayerStation(iL);
-    if (station > 0) continue;
+    // if (station > 0) continue;
     auto& candList = candidates[station];
     Candidate cand;  // starts empty
     cand.station = station;
@@ -185,7 +185,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   }
 
   // return ActsExamples::ProcessCode::SUCCESS;
-  ACTS_DEBUG("making space points from straws");
+  ACTS_VERBOSE("making space points from straws");
 
   SimSpacePointContainer spacePoints;
 
@@ -196,7 +196,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   std::vector<double> d;
 
   for (int iStation=0;iStation<nStations;iStation++) {
-    ACTS_DEBUG("Station " << iStation << ": number of filtered candidates " << candidates[iStation].size());
+    ACTS_VERBOSE("Station " << iStation << ": number of filtered candidates " << candidates[iStation].size());
 
     for (auto it = candidates[iStation].begin(); it != candidates[iStation].end();) {
       auto& candidate = *it;
@@ -228,38 +228,32 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
         c[i] = z[i]*cosp;
         g[i] = -x*sinp + y*cosp;
         d[i] = sqrt(cov(0,0));
-        // ACTS_DEBUG("  x=" << x << " y=" << y <<" z=" << z[i]);  
       }
-      double t,k,dt,dk;
-      double chi2 = analytic(s, c, g, d, t, k, dt, dk);
-      ACTS_DEBUG("  n=" << n << " t=" << t <<" k=" << k << " chi2/ndf=" << chi2/(n-2));
-      double tx,ty,p;
-
-      double chi2helix = helix(z, s, c, g, d, tx, ty, p);
-//      ACTS_DEBUG("  n=" << n << " tx=" << tx <<" ty=" << ty << " chi2/ndf=" << chi2helix/(n-2));
-      ACTS_DEBUG("  n=" << n << " t=" << sqrt(tx*tx+ty*ty) <<" k=" << ty/tx << " chi2/ndf=" << (n>3 ? chi2helix/(n-3) : chi2helix));
+      double txl, tyl, varxx, varyy, varxy;
+      double chi2lin = linear(s, c, g, d, txl, tyl, varxx, varyy, varxy, 0);
+      ACTS_VERBOSE("lin:  n=" << n << " tx=" << txl <<" ty=" << tyl << " chi2/ndf=" << chi2lin/(n-2));
+      // setting variances obtained from the linear fit
+      candidate.varxx = varxx;
+      candidate.varxy = varxy;
+      candidate.varyy = varyy;
+      double tx, ty, k;
+      double chi2par = parabolic(z, s, c, g, d, tx, ty, k, 0);
+      ACTS_VERBOSE("par:  n=" << n << " tx=" << tx <<" ty=" << ty << " chi2/ndf=" << (n>3 ? chi2par/(n-3) : chi2par));
       candidate.tx = tx;
       candidate.ty = ty;
-      candidate.k = p;
-      // candidate.tx = t*cos(atan(k));
-      // candidate.ty = t*sin(atan(k));
-      // candidate.k = 0;
-
-      candidate.chi2 = chi2helix;
-//       double chi2parabolic = parabolic(z, s, c, g, d, tx, ty, p);
-// //      ACTS_DEBUG("  n=" << n << " tx=" << tx <<" ty=" << ty << " chi2/ndf=" << chi2helix/(n-2));
-//       ACTS_DEBUG("  n=" << n << " t=" << sqrt(tx*tx+ty*ty) <<" k=" << ty/tx << " chi2/ndf=" << (n>3 ? chi2parabolic/(n-3) : chi2parabolic));
-      if (n>3) chi2helix/=(n-3);
-      if (chi2helix>1000) {
-        ACTS_DEBUG("  erasing...");        
+      candidate.k = k;
+      candidate.chi2 = chi2par;
+      double chi2ndf = n>3 ? chi2par/(n-3) : chi2par;
+      if (chi2ndf > 1000) {
+        ACTS_VERBOSE("  erasing...");        
         it = candidates[iStation].erase(it);
       } else {
         it++;
       }
     }
 
-    ACTS_DEBUG("Start filtering...");        
-    ACTS_DEBUG("Collecting number of candidates per measurement...");        
+    ACTS_VERBOSE("Start filtering...");        
+    ACTS_VERBOSE("Collecting number of candidates per measurement...");        
     int nCandidates = candidates[iStation].size();
     std::map<int,std::set<int>> candidatesPerMeasurement;
     std::vector<Candidate> selectedCandidates;    
@@ -275,7 +269,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       i++;
     }
 
-    ACTS_DEBUG("Info on shared measurements...");
+    ACTS_VERBOSE("Info on shared measurements...");
     for (int i=0;i<selectedCandidates.size();i++){
       auto& candidate = selectedCandidates[i];
       for (auto& isl : candidate.sourceLinks){
@@ -284,7 +278,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
           candidate.sharedMeasurements++;
         }
       }
-      printf("Candidate %d, meas: %d, shared: %d, chi2=%f\n", i, candidate.sourceLinks.size(), candidate.sharedMeasurements, candidate.chi2);
+      // printf("Candidate %d, meas: %d, shared: %d, chi2=%f\n", i, candidate.sourceLinks.size(), candidate.sharedMeasurements, candidate.chi2);
     }
 
     auto sharedMeasurementsComperator = [&selectedCandidates](std::size_t a, std::size_t b) {
@@ -302,13 +296,13 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     };
 
     int maximumSharedHits = 1;
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 10000; i++) {
       if (selectedCandidateIds.empty()) break;
       auto maximumSharedMeasurements = *std::max_element(selectedCandidateIds.begin(), selectedCandidateIds.end(), sharedMeasurementsComperator);
-      printf("candidate %d with maximumSharedMeasurements=%d\n",maximumSharedMeasurements, selectedCandidates[maximumSharedMeasurements].sharedMeasurements);
+      // printf("candidate %d with maximumSharedMeasurements=%d\n",maximumSharedMeasurements, selectedCandidates[maximumSharedMeasurements].sharedMeasurements);
       if (selectedCandidates[maximumSharedMeasurements].sharedMeasurements <= maximumSharedHits) break;
       auto badCandidate = *std::max_element(selectedCandidateIds.begin(), selectedCandidateIds.end(), candidateComperator);
-      printf("badCandidate=%d %zu\n",badCandidate, selectedCandidates[badCandidate].sourceLinks.size());
+      // printf("badCandidate=%d %zu\n",badCandidate, selectedCandidates[badCandidate].sourceLinks.size());
       // remove bad track
       for (auto& isl : selectedCandidates[badCandidate].sourceLinks) {
         int im = isl.index();
@@ -320,28 +314,35 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       }
       selectedCandidateIds.erase(badCandidate);
     }
-    ACTS_DEBUG("Selected candidates...");
+    ACTS_VERBOSE("Selected candidates...");
     for (auto& id : selectedCandidateIds) {
       auto& sp = selectedCandidates[id];
       // TODO read from config
-//      if (sp.station == 0) sp.z = 2070;
-      if (sp.station == 0) sp.z = 2120;
-      if (sp.station == 1) sp.z = 2340;
-      if (sp.station == 2) sp.z = 2560;
-      if (sp.station == 3) sp.z = 2780;
-//      if (sp.station == 4) sp.z = 3050;
-      if (sp.station == 4) sp.z = 3000;
-      sp.x = sp.tx * sp.z + sp.k * sp.ty * sp.z * sp.z;
-      sp.y = sp.ty * sp.z - sp.k * sp.tx * sp.z * sp.z;
-      printf("Candidate %d, meas: %d, shared: %d, chi2=%f\n", id, sp.sourceLinks.size(), sp.sharedMeasurements, sp.chi2);
-      ACTS_DEBUG("SP: x=" << sp.x << " y=" << sp.y << " z=" << sp.z);
-
+//       if (sp.station == 0) sp.z = 2070;
+// //      if (sp.station == 0) sp.z = 2120;
+// //      if (sp.station == 1) sp.z = 2340;
+//       else if (sp.station == 2) sp.z = 2560;
+// //      if (sp.station == 3) sp.z = 2780;
+//       else if (sp.station == 4) sp.z = 3050;
+//       else continue;
+// //      if (sp.station == 4) sp.z = 3000;
+      if (sp.station==1 || sp.station==3) continue;
       Acts::SourceLink slink1{sp.sourceLinks[0]};
       Acts::SourceLink slink2{sp.sourceLinks[sp.sourceLinks.size()-1]};
-      //std::vector<Acts::SourceLink> slinks = {slink1, slink2};
+      const Acts::Surface* surface = m_slSurfaceAccessor.value()(slink1);
+      sp.z = surface->center(ctx.geoContext)[2];
+      sp.x = sp.tx * sp.z + sp.k * sp.ty * sp.z * sp.z;
+      sp.y = sp.ty * sp.z - sp.k * sp.tx * sp.z * sp.z;
+      // printf("Candidate %d, meas: %d, shared: %d, chi2=%f\n", id, sp.sourceLinks.size(), sp.sharedMeasurements, sp.chi2);
+      ACTS_VERBOSE("SP: k=" << sp.k << " x=" << sp.x << " y=" << sp.y << " z=" << sp.z << " var_xy=" << sp.varxy*sp.z*sp.z);
+
+
       boost::container::static_vector<Acts::SourceLink, 2> slinks = {slink1, slink2};
       Acts::Vector3 pos{sp.x,sp.y,sp.z};
-      std::back_inserter(spacePoints) = SimSpacePoint(pos, 0, 0, 0, 0, slinks);
+      double var_r = (sp.x*sp.x*sp.varxx + sp.y*sp.y*sp.varyy + 2*sp.x*sp.y*sp.varxy)/(sp.x*sp.x+sp.y*sp.y);
+      double var_z = 0.1;
+      std::back_inserter(spacePoints) = SimSpacePoint(pos, 0, var_r, var_z, 0, slinks);
+      // std::back_inserter(spacePoints) = SimSpacePoint(pos, sp.varxy*sp.z*sp.z*Acts::UnitConstants::ns, sp.varxx*sp.z*sp.z, sp.varyy*sp.z*sp.z, 0, slinks);
     }
   }
 
@@ -372,150 +373,64 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
 
   spacePoints.shrink_to_fit();
 
-  ACTS_DEBUG("Created " << spacePoints.size() << " space points");
+  ACTS_VERBOSE("Created " << spacePoints.size() << " space points");
   m_outputSpacePoints(ctx, std::move(spacePoints));
 
   return ActsExamples::ProcessCode::SUCCESS;
 }
 
-/*
-double ActsExamples::MySpacePointMaker::parabolic(
-    const std::vector<double>& z,
-    const std::vector<double>& s,
-    const std::vector<double>& c,
-    const std::vector<double>& g,
-    const std::vector<double>& d,
-    double &tx,
-    double &ty,
-    double &k
-) const{
-  const int n = z.size();
-  Eigen::MatrixXd A(n, 4);
-  Eigen::VectorXd b(n);
-  for (int i = 0; i < n; ++i) {
-    A(i, 0) =  s[i];           // t_x
-    A(i, 1) = -c[i];           // t_y
-    A(i, 2) =  z[i] * c[i];    // u_x
-    A(i, 3) =  z[i] * s[i];    // u_y
-    b(i) = -g[i];
+double ActsExamples::MySpacePointMaker::linear(
+  std::vector<double> &s, std::vector<double> &c, std::vector<double> &g, std::vector<double> &d, 
+  double &tx, double &ty, double &varxx, double &varyy, double &varxy, bool debug) const
+{
+  int n = s.size();
+  double ss = 0.0;
+  double cc = 0.0;
+  double sc = 0.0;
+  double gs = 0.0;
+  double gc = 0.0;
+
+  for (int i = 0; i < n; ++i){
+    double w = 1.0 / (d[i] * d[i]);
+    ss += w * s[i] * s[i];
+    cc += w * c[i] * c[i];
+    sc += w * s[i] * c[i];
+    gs += w * g[i] * s[i];
+    gc += w * g[i] * c[i];
   }
-
-  // Solve least squares: min ||A*theta - b||
-  Eigen::VectorXd theta = (A.transpose() * A).ldlt().solve(A.transpose() * b);
-
-  tx = theta(0);
-  ty = theta(1);
-  double ux = theta(2);
-  double uy = theta(3);
-
-  double denom = tx * tx + ty * ty;
-  if (denom == 0.0)
-    throw std::runtime_error("Cannot extract curvature (zero slope)");
-
-  k = (ux * tx + uy * ty) / denom;
+  double dd = cc * ss - sc * sc;
+  tx = (sc * gc - cc * gs) / dd;
+  ty = (ss * gc - sc * gs) / dd;
+  varxx = cc / dd;
+  varyy = ss / dd;
+  varxy = sc / dd;
 
   double chi2 = 0;
   for (int i=0;i<n;i++){
-    double chi = (s[i]*tx - c[i]*ty + z[i]*c[i]*k*tx + z[i]*s[i]*k*ty + g[i])/d[i];
+    double chi = (s[i]*tx - c[i]*ty + g[i])/d[i];
     chi2 += chi*chi;
   }
-  return chi2;
-}
-*/
+  if (debug) printf("tx=%f ty=%f chi2=%f varxx=%e varyy=%e varxy=%e\n",tx, ty, chi2, varxx, varyy, varxy);
 
-double ActsExamples::MySpacePointMaker::analytic(std::vector<double> &a, std::vector<double> &cz, std::vector<double> &g, std::vector<double> &s, 
-                                                 double &t, double &k, double &dt, double &dk, bool debug) const{
-  
-  int n = a.size();
-  std::vector<double> b(n,0);
-  for (int i=0;i<n;i++) b[i] = -cz[i];
-  std::vector<double> aa(n,0);
-  std::vector<double> bb(n,0);
-  double A = 0;
-  double B = 0;
-  double sigA2 = 0;
-  double sigB2 = 0;
-  double covAB = 0;
-
-  for (int i=0;i<n;i++){
-    for (int j=0;j<n;j++){
-      double ab = (a[i]*b[j]-b[i]*a[j]);
-      aa[i]+=b[j]*ab;
-      bb[i]+=a[j]*ab;
-    }
-    A+= g[i]*aa[i];
-    B+= g[i]*bb[i];
-    sigA2+=s[i]*s[i]*aa[i]*aa[i];
-    sigB2+=s[i]*s[i]*bb[i]*bb[i];
-    covAB+=s[i]*s[i]*aa[i]*bb[i];
-  }
-
-  k = - B/A;
-  dk = sqrt(B*B*sigA2+A*A*sigB2-2*A*B*covAB)/A/A;
-
-  std::vector<double> abk(n,0);
-  std::vector<double> vt(n,0);
-  std::vector<double> dtdk(n,0);
-  std::vector<double> dkdc(n,0);
-  std::vector<double> dtdc(n,0);
-  double num = 0;
-  double den = 0;
-  double p1 = 0;
-  double p2 = 0;
-  for (int i=0;i<n;i++){
-    abk[i] = a[i]+b[i]*k;
-    num += g[i]*abk[i];
-    den += abk[i]*abk[i];
-    p1 += a[i]*b[i];
-    p2 += b[i]*b[i];
-  }
-  double cosa = 1./sqrt(1+k*k);
-  double sina = k*cosa;
-
-  t = -1./cosa*num/den;
-
-  for (int i=0; i<n; i++){
-    vt[i]  = -1./cosa*abk[i]/den;
-    dtdk[i] = vt[i]*(k/(1+k*k) + b[i]/abk[i]-2*(p1+p2*k)/den);
-    dkdc[i] = (aa[i]*B - bb[i]*A)/A/A;
-  }
-
-  double dt2 = 0;
-  for (int i=0; i<n; i++){
-    dtdc[i] = vt[i];
-    for (int j=0; j<n; j++){
-      dtdc[i] += g[j]*dtdk[j]*dkdc[i];
-    }
-
-    dt2+=s[i]*s[i]*dtdc[i]*dtdc[i];
-  }
-
-  dt = sqrt(dt2);
-
-  double chi2 = 0;
-  for (int i=0;i<n;i++){
-    double d = a[i]*t*cosa + b[i]*t*sina + g[i];
-    chi2+=d*d/s[i]/s[i];
-  }
   return chi2;
 }
 
-double ActsExamples::MySpacePointMaker::helix(
+double ActsExamples::MySpacePointMaker::parabolic(
   std::vector<double> &z, std::vector<double> &s, std::vector<double> &c, std::vector<double> &g,
-  std::vector<double> &d, double &tx, double &ty, double &p, bool debug) const
+  std::vector<double> &d, double &tx, double &ty, double &k, bool debug) const
 {
   int n = s.size();
   std::vector<double> sk(n, 0.);
   std::vector<double> ck(n, 0.);
-  auto fk = [&n,&s,&c,&z,&g,&tx,&ty,&sk,&ck](double k) {
+  auto fk = [&n,&s,&c,&z,&g,&tx,&ty,&sk,&ck](double kkk) {
     double ss = 0;
     double sc = 0;
     double cc = 0;
     double gs = 0;
     double gc = 0;
     for (int i=0;i<n;i++){
-      sk[i] = (s[i] + k*z[i]*c[i]);
-      ck[i] = (c[i] - k*z[i]*s[i]);
+      sk[i] = (s[i] + kkk*z[i]*c[i]);
+      ck[i] = (c[i] - kkk*z[i]*s[i]);
       ss += sk[i]*sk[i];
       sc += sk[i]*ck[i];
       cc += ck[i]*ck[i];
@@ -538,27 +453,29 @@ double ActsExamples::MySpacePointMaker::helix(
   double kk = -2*f0/dfdk;
   double kmin = kk>0 ? 0  : kk;
   double kmax = kk>0 ? kk :  0;
-  // printf("%f %f %f %f\n",kmin, kmax, fk(kmin), fk(kmax));
+  if (debug) printf("%f %f %f %f\n",kmin, kmax, fk(kmin), fk(kmax));
 
   ROOT::Math::Functor1D functor(fk);
   ROOT::Math::RootFinder rf(ROOT::Math::RootFinder::kGSL_BISECTION);
   rf.SetFunction(functor, kmin, kmax);
   rf.Solve();
-  p = rf.Root();
-  printf("k=%e %f iterations=%d\n",p, fk(p), rf.Iterations());
+  k = rf.Root();
+  if (debug) printf("k=%e %f iterations=%d\n", k, fk(k), rf.Iterations());
 
-  double sum_tx = 0;
-  double sum_ty = 0;
-  printf("check %f %f %f\n",tx, ty, p);
-  for (int i=0;i<n;i++){
-    double a = s[i] + p*z[i]*c[i];
-    double b = c[i] - p*z[i]*s[i];
-    double d = a*tx - b*ty + g[i];
-    sum_tx += d*a;
-    sum_ty += d*b;
+  if (debug) { 
+    printf("checking tx=%f ty=%f k=%f\n",tx, ty, k);
+    double sum_tx = 0;
+    double sum_ty = 0;
+    for (int i=0;i<n;i++){
+      double a = s[i] + k*z[i]*c[i];
+      double b = c[i] - k*z[i]*s[i];
+      double d = a*tx - b*ty + g[i];
+      sum_tx += d*a;
+      sum_ty += d*b;
+    }
+    printf("sum_tx=%f\n",sum_tx);
+    printf("sum_ty=%f\n",sum_ty);
   }
-  printf("sum_tx=%f\n",sum_tx);
-  printf("sum_ty=%f\n",sum_ty);
 
   double chi2 = 0;
   for (int i=0;i<n;i++){
