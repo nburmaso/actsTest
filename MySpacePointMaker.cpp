@@ -238,13 +238,14 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       candidate.varyy = varyy;
       double tx, ty, k;
       double chi2par = parabolic(z, s, c, g, d, tx, ty, k, 0);
-      ACTS_VERBOSE("par:  n=" << n << " tx=" << tx <<" ty=" << ty << " chi2/ndf=" << (n>3 ? chi2par/(n-3) : chi2par));
+      double chi2ndf = n>3 ? chi2par/(n-3) : chi2par;
+      ACTS_VERBOSE("par:  n=" << n << " tx=" << tx <<" ty=" << ty << " chi2/ndf=" << chi2ndf);
+      printf("chi2ndf=%f\n",chi2ndf);
       candidate.tx = tx;
       candidate.ty = ty;
       candidate.k = k;
       candidate.chi2 = chi2par;
-      double chi2ndf = n>3 ? chi2par/(n-3) : chi2par;
-      if (chi2ndf > 1000) {
+      if (chi2ndf > 20) {
         ACTS_VERBOSE("  erasing...");        
         it = candidates[iStation].erase(it);
       } else {

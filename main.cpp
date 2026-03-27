@@ -51,7 +51,7 @@ int main(int argc, char *argv[]){
   TString inputDir = "none";
   TString outputDir = "test";
 //  TString outputDir = "roc_pi_16_7deg";
-  int nEvents = 1000;
+  int nEvents = 10000;
   //Acts::PdgParticle pdgCode = Acts::eProton;
   Acts::PdgParticle pdgCode = Acts::ePionPlus;
   double etaMin = 1.6;
@@ -88,8 +88,8 @@ int main(int argc, char *argv[]){
 
   bool isroc = !outputDir.Contains("noroc");
   bool isframe = !outputDir.Contains("noframe");
-  isroc = 0;
-  isframe = 0;
+  isroc = 1;
+  isframe = 1;
   
   printf("Running acts: %d eta=%.1f vzMax=%.0f\n", pdgCode, etaMin, vzMax);
 
@@ -129,18 +129,22 @@ int main(int argc, char *argv[]){
   genCfg.pdg = pdgCode;
   // genCfg.thetaMin = 2 * atan(exp(-etaMax));
   // genCfg.thetaMax = 2 * atan(exp(-etaMin));
-  // genCfg.pMin = 0.2;
-  // genCfg.pMax = 1.0;
-  genCfg.pMin = 0.5;
-  genCfg.pMax = 0.501;
+  genCfg.pMin = 0.2;
+  genCfg.pMax = 1.0;
+  // genCfg.pMin = 0.5;
+  // genCfg.pMax = 0.501;
   // genCfg.phiMin = M_PI/180.*45.;
   // genCfg.phiMax = M_PI/180.*45.00001;
 
   // central UrQMD-like occupancy
+  genCfg.thetaMin = 2 * atan(exp(-1.91));
+  genCfg.thetaMax = 2 * atan(exp(-1.90));
+  // genCfg.thetaMin = 2 * atan(exp(-1.61));
+  // genCfg.thetaMax = 2 * atan(exp(-1.60));
   // genCfg.thetaMin = 2 * atan(exp(-1.95));
   // genCfg.thetaMax = 2 * atan(exp(-1.55));
-  genCfg.thetaMin = 2 * atan(exp(-1.76));
-  genCfg.thetaMax = 2 * atan(exp(-1.74));
+  // genCfg.thetaMin = 2 * atan(exp(-1.76));
+  // genCfg.thetaMax = 2 * atan(exp(-1.74));
   // genCfg.thetaMin = 2 * atan(exp(-1.93));
   // genCfg.thetaMax = 2 * atan(exp(-1.91));
   // genCfg.thetaMin = 2 * atan(exp(-1.59));
@@ -150,9 +154,9 @@ int main(int argc, char *argv[]){
   // genCfg.pMin = 1.2;
   // genCfg.pMax = 1.21;
 //  genCfg.randomizeCharge = true;
-//  genCfg.numParticles = 90;
+genCfg.numParticles = 1;
 //  genCfg.numParticles = 10;
-  genCfg.numParticles = 1;
+//  genCfg.numParticles = 1;
   ActsExamples::EventGenerator::Generator gen{
       std::make_shared<ActsExamples::FixedMultiplicityGenerator>(1),
       std::make_shared<ActsExamples::FixedPrimaryVertexPositionGenerator>(),
@@ -225,7 +229,7 @@ int main(int argc, char *argv[]){
   // std::vector<std::pair<Acts::GeometryIdentifier, ActsExamples::DigiComponentsConfig>> elements = { {Acts::GeometryIdentifier{}, digiConfig} };
 
   // Digitization config
-  // ActsExamples::MyDigitizationAlgorithm::Config digiCfg;
+  //ActsExamples::MyDigitizationAlgorithm::Config digiCfg;
   ActsExamples::DigitizationAlgorithm::Config digiCfg;
   digiCfg.inputSimHits = simhits;
   digiCfg.randomNumbers = rnd;

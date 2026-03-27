@@ -4,25 +4,30 @@
 #include "TCanvas.h"
 #include "TH1D.h"
 #include "ActsFatras/EventData/Barcode.hpp"
+#include "../MyFtdDetector.h"
 
 bool isGoodFtd(int64_t layerMask, int minHits = 3){
   int nHits[5] = {0,0,0,0,0}; // number of hits per station
   for (int st=0;st<5;st++){
-    nHits[st] += (layerMask & (1ull << (7*st + 5))) > 0;
-    // nHits[st] += (layerMask & (1ull << (7*st + 7))) > 0; with ROC/Flange in ACTS test
+    for (int l=0;l<7;l++) {
+      nHits[st] += ((layerMask & (1ull << (7*st+l))) > 0);
+    }
   }
-  if (nHits[0]<1) return 0;
-  if (nHits[2]<1) return 0;
-  if (nHits[4]<1) return 0;
+  if (nHits[0]<3) return 0;
+  if (nHits[2]<3) return 0;
+  if (nHits[4]<3) return 0;
   return 1;
 }
 
-
+void analyse_seed_efficiency(TString dir = "../build/test", double etaMean = 1.9, double etaDif = 0.05, bool seedable = 1){
+//void analyse_seed_efficiency(TString dir = "../build/test", double etaMean = 1.9, double etaDif = 0.05, bool seedable = 1){
 //void analyse_seed_efficiency(TString dir = "../build/notpc_pi_16_7deg", double etaMean = 1.6, double etaDif = 0.05, bool seedable = 1){
-void analyse_seed_efficiency(TString dir = "../acts_pi_16", double etaMean = 1.6, double etaDif = 0.05, bool seedable = 1){
+//void analyse_seed_efficiency(TString dir = "../acts_pi_16", double etaMean = 1.6, double etaDif = 0.05, bool seedable = 1){
 //void analyse_seed_efficiency(TString dir = "../acts", double etaMean = 1.9, double etaDif = 0.05, bool seedable = 1){
 //void analyse_seed_efficiency(TString dir = "../acts", double etaMean = 1.6, double etaDif = 0.05, bool seedable = 1){
   dir.Append("/");
+  // int shift = 0; //  isroc = 0;  isframe = 0;
+  int shift = 3; //  isroc = 1;  isframe = 1;
 
   // setup particles
   TFile* fPart = new TFile(TString(dir + "particles.root"));
@@ -77,10 +82,11 @@ void analyse_seed_efficiency(TString dir = "../acts_pi_16", double etaMean = 1.6
     }
     // if (meas_volume_id!=16) continue;  // with TPC volumes
     if (meas_volume_id!=6) continue;
+    int layer = meas_layer_id - shift;
     auto& mapParticleFtdLayerMask = vEventParticleFtdLayerMask[meas_event_id];
     int ip = meas_particles[0][2] - 1;
     if (auto m = mapParticleFtdLayerMask.find(ip); m == mapParticleFtdLayerMask.end()) mapParticleFtdLayerMask[ip] = 0;
-    mapParticleFtdLayerMask[ip] |= (1ull << meas_layer_id);
+    mapParticleFtdLayerMask[ip] |= (1ull << layer);
   }
 
   TH1D* hMcPtPi = new TH1D("hMcPtPi","",100,0.,1.);
@@ -143,17 +149,19 @@ void analyse_seed_efficiency(TString dir = "../acts_pi_16", double etaMean = 1.6
   hMcPtPi->Draw();
 
   new TCanvas;
-  hMcPtPr->Draw();
-
-  new TCanvas;
   auto hEffPtPi = (TH1D*) hRcPtPi->Clone("hEffPtPi");
   hEffPtPi->Divide(hRcPtPi, hMcPtPi, 1, 1, "B");
   hEffPtPi->Draw();
-  
-  new TCanvas;
-  auto hEffPtPr = (TH1D*) hRcPtPr->Clone("hEffPtPr");
-  hEffPtPr->Divide(hRcPtPr, hMcPtPr, 1, 1, "B");
-  hEffPtPr->Draw();
+
+  if (0) {
+    new TCanvas;
+    hMcPtPr->Draw();
+ 
+    new TCanvas;
+    auto hEffPtPr = (TH1D*) hRcPtPr->Clone("hEffPtPr");
+    hEffPtPr->Divide(hRcPtPr, hMcPtPr, 1, 1, "B");
+    hEffPtPr->Draw();
+  }
 
   TFile* f = new TFile(TString(dir + "seed_efficiency.root"),"update");
   hMcPtPi->Write(Form("hMcPtPi%.0f",etaMean*10));

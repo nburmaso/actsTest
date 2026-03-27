@@ -5,53 +5,42 @@
 #include "TH1D.h"
 #include "TH2D.h"
 #include "ActsFatras/EventData/Barcode.hpp"
-#include "analyse_summary.C"
+#include "tree_summary.C"
 
 bool isGoodFtd(int64_t layerMask, int minHits = 5){
   int nHits[5] = {0,0,0,0,0}; // number of hits per station
   for (int st=0;st<5;st++){
-    nHits[st] += (layerMask & (1ull << (7*st + 2))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + 3))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + 4))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + 6))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + 7))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + 8))) > 0;
+    for (int l=0;l<7;l++) {
+      if (l==3) continue;
+      nHits[st] += ((layerMask & (1ull << (7*st+l))) > 0);
+    }
   }
-  if (nHits[0]<2) return 0;
-  if (nHits[1]<2) return 0;
-  if (nHits[2]<2) return 0;
-  if (nHits[3]<2) return 0;
-  if (nHits[4]<2) return 0;
+  if (nHits[0]<1) return 0;
+  if (nHits[1]<1) return 0;
+  if (nHits[2]<1) return 0;
+  if (nHits[3]<1) return 0;
+  if (nHits[4]<1) return 0;
   return 1;
 }
 
 bool isGoodSeed(int64_t layerMask, int minHits = 5){
   int nSeeds[5] = {0,0,0,0,0}; // number of seeds per station
   for (int st=0;st<5;st++){
-    nSeeds[st] += (layerMask & (1ull << (7*st + 5))) > 0;
+    for (int l=0;l<7;l++) {
+      if (l==3) continue;
+      nSeeds[st] += ((layerMask & (1ull << (7*st+l))) > 0);
+    }
   }
-  if (nSeeds[0]<1) return 0;
-  if (nSeeds[2]<1) return 0;
-  if (nSeeds[4]<1) return 0;
+  if (nSeeds[0]<3) return 0;
+  if (nSeeds[2]<3) return 0;
+  if (nSeeds[4]<3) return 0;
   return 1;
 }
 
-void analyse_tracking_efficiency(TString dir = "../build/test", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1, int nPrimaries = 90){
-//void analyse_tracking_efficiency(TString dir = "../acts", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1, int nPrimaries = 90){
-//void analyse_tracking_efficiency(TString dir = "../acts", double etaMean = 1.9, double etaDif = 0.05, bool refit = 0, bool trackable = 1){
-//void analyse_tracking_efficiency(TString dir = "../acts_pi_16", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
-//void analyse_tracking_efficiency(TString dir = "../acts_pi_19", double etaMean = 1.9, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
-
-//void analyse_tracking_efficiency(TString dir = "notpc_pi_19", double etaMean = 1.9, double etaDif = 0.1, bool refit = 0){
-//void analyse_tracking_efficiency(TString dir = "notpc_pi_16", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0){
-
-//void analyse_tracking_efficiency(TString dir = "notpc_pi_16_7deg", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0){
-//void analyse_tracking_efficiency(TString dir = "notpc_pi_19_7deg", double etaMean = 1.9, double etaDif = 0.1, bool refit = 0){
-//void analyse_tracking_efficiency(TString dir = "roc_pi_19_7deg", double etaMean = 1.9, double etaDif = 0.1, bool refit = 0){
-//void analyse_tracking_efficiency(TString dir = "roc_pi_16_7deg", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0){
-//void analyse_tracking_efficiency(TString dir = "roc_pi_19_15deg", double etaMean = 1.9, double etaDif = 0.1, bool refit = 0){
-//void analyse_tracking_efficiency(TString dir = "roc_pi_16_15deg", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0){
+void analyse_tracking_efficiency(TString dir = "../build/test", double etaMean = 1.9, double etaDif = 0.05, bool refit = 0, bool trackable = 1, int nPrimaries = 1){
   dir.Append("/");
+  // int shift = 1; //  isroc = 0;  isframe = 0;
+  int shift = 3; //  isroc = 1;  isframe = 1;
 
   // setup particles
   TFile* fPart = new TFile(TString(dir + "particles.root"));
@@ -103,12 +92,12 @@ void analyse_tracking_efficiency(TString dir = "../build/test", double etaMean =
       mapFirstMeaurementIndex[meas_event_id] = im;
     }
     // if (meas_volume_id!=16) continue;  // with TPC volumes
-    // if (meas_volume_id!=6) continue;
-    if (meas_volume_id!=1) continue; // acts test
+    if (meas_volume_id!=6) continue;
+    int layer = meas_layer_id - shift;
     auto& mapParticleFtdLayerMask = vEventParticleFtdLayerMask[meas_event_id];
     int ip = meas_particles[0][2] - 1;
     if (auto m = mapParticleFtdLayerMask.find(ip); m == mapParticleFtdLayerMask.end()) mapParticleFtdLayerMask[ip] = 0;
-    mapParticleFtdLayerMask[ip] |= (1ull << meas_layer_id);
+    mapParticleFtdLayerMask[ip] |= (1ull << layer);
   }
 
   // setup seeds
@@ -239,7 +228,7 @@ void analyse_tracking_efficiency(TString dir = "../build/test", double etaMean =
       hChi2all->Fill(m_chi2Sum->at(it)/m_nMeasurements->at(it));
       auto& layers = m_measurementLayer->at(it);
       int64_t trackFtdLayerMask = 0;
-      for (int il=0;il<layers.size();il++) trackFtdLayerMask |= (1ull << layers[il]);
+      for (int il=0;il<layers.size();il++) trackFtdLayerMask |= (1ull << (layers[il] - shift));
       if (trackable && !isGoodFtd(trackFtdLayerMask)) continue;
       hMeasurements->Fill(m_nMeasurements->at(it));
       hMajorityHits->Fill(m_nMajorityHits->at(it));
@@ -298,23 +287,25 @@ void analyse_tracking_efficiency(TString dir = "../build/test", double etaMean =
   hMcPtPi->Draw();
 
   new TCanvas;
-  hMcPtPr->Draw();
-
-  new TCanvas;
   auto hEffPtPi = (TH1D*) hRcPtPi->Clone("hEffPtPi");
   hEffPtPi->Divide(hRcPtPi, hMcPtPi, 1, 1, "B");
   hEffPtPi->Draw();
   
+  new TCanvas;
+  hPtResVsPtPi->Draw();
+
+  if (0) {
+  new TCanvas;
+  hMcPtPr->Draw();
+
   new TCanvas;
   auto hEffPtPr = (TH1D*) hRcPtPr->Clone("hEffPtPr");
   hEffPtPr->Divide(hRcPtPr, hMcPtPr, 1, 1, "B");
   hEffPtPr->Draw();
 
   new TCanvas;
-  hPtResVsPtPi->Draw();
-
-  new TCanvas;
   hPtResVsPtPr->Draw();
+  }
 
   new TCanvas;
   hChi2all->SetLineColor(kBlue);
