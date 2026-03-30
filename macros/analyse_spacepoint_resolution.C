@@ -7,7 +7,7 @@
 //void analyse_spacepoint_resolution(TString dir = "../build/test02", int selected_layer = 4){
 //void analyse_spacepoint_resolution(TString dir = "../build/test02_18", int selected_layer = 4){
 //void analyse_spacepoint_resolution(TString dir = "../build/test02_16", int selected_layer = 4){
-void analyse_spacepoint_resolution(TString dir = "../build/test", int selected_layer = 4){
+void analyse_spacepoint_resolution(TString dir = "../build/test", int selected_layer = 1){
   dir.Append("/");
   MyFtdGeo fg;
   double lz = fg.GetLayerPositions()[selected_layer];
