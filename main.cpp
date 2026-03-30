@@ -230,6 +230,7 @@ genCfg.numParticles = 1;
 
   // Digitization config
   ActsExamples::MyDigitizationAlgorithm::Config digiCfg;
+  digiCfg.doDuplicateStrawMeasurements = false;
   //ActsExamples::DigitizationAlgorithm::Config digiCfg;
   digiCfg.inputSimHits = simhits;
   digiCfg.randomNumbers = rnd;
