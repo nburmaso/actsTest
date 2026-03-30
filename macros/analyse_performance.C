@@ -8,34 +8,30 @@
 #include "ActsFatras/EventData/Barcode.hpp"
 #include "tree_summary.C"
 
-bool isGoodFtd(int64_t layerMask, int minHits = 5, int shift = 3){
+bool isGoodFtd(int64_t layerMask, int minHits = 5){
   int nHits[5] = {0,0,0,0,0}; // number of hits per station
   for (int st=0;st<5;st++){
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 0))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 1))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 2))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 4))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 5))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 6))) > 0;
+    for (int l=0;l<7;l++) {
+      if (l==3) continue;
+      nHits[st] += ((layerMask & (1ull << (7*st+l))) > 0);
+    }
   }
   // printf("%d %d %d %d %d\n",nHits[0],nHits[1],nHits[2],nHits[3],nHits[4]);
-  if (nHits[0]<2) return 0;
-  if (nHits[1]<2) return 0;
-  if (nHits[2]<2) return 0;
-  if (nHits[3]<2) return 0;
-  if (nHits[4]<2) return 0;
+  if (nHits[0]<3) return 0;
+  if (nHits[1]<3) return 0;
+  if (nHits[2]<3) return 0;
+  if (nHits[3]<3) return 0;
+  if (nHits[4]<3) return 0;
   return 1;
 }
 
-bool isGoodRecoFtd(int64_t layerMask, int minHits = 5, int shift = 3){
+bool isGoodRecoFtd(int64_t layerMask, int minHits = 5){
   int nHits[5] = {0,0,0,0,0}; // number of hits per station
   for (int st=0;st<5;st++){
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 0))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 1))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 2))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 4))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 5))) > 0;
-    nHits[st] += (layerMask & (1ull << (7*st + shift + 6))) > 0;
+    for (int l=0;l<7;l++) {
+      if (l==3) continue;
+      nHits[st] += ((layerMask & (1ull << (7*st+l))) > 0);
+    }
   }
   if (nHits[0]<1) return 0;
   if (nHits[1]<1) return 0;
@@ -45,27 +41,43 @@ bool isGoodRecoFtd(int64_t layerMask, int minHits = 5, int shift = 3){
   return 1;
 }
 
-bool isGoodSeed(int64_t layerMask, int minHits = 5, int shift = 3){
+bool isGoodSeed(int64_t layerMask, int minHits = 5){
   int nSeeds[5] = {0,0,0,0,0}; // number of seeds per station
-  int nSeedsB = (layerMask & (1ull << (shift -1))) > 0;
-  int nSeedsF = (layerMask & (1ull << (7*4 + shift + 7))) > 0;
   for (int st=0;st<5;st++){
-    nSeeds[st] += (layerMask & (1ull << (7*st + shift + 3))) > 0;
+    for (int l=0;l<7;l++) {
+      if (l==3) continue;
+      nSeeds[st] += ((layerMask & (1ull << (7*st+l))) > 0);
+    }
   }
-  // printf("%d %d %d\n", nSeedsB, nSeeds[2], nSeedsF);
-  if (nSeedsB<1) return 0;
-  if (nSeedsF<1) return 0;
-  // if (nSeeds[0]<1) return 0;
-  if (nSeeds[2]<1) return 0;
-  // if (nSeeds[4]<1) return 0;
+  if (nSeeds[0]<3) return 0;
+  if (nSeeds[2]<3) return 0;
+  if (nSeeds[4]<3) return 0;
   return 1;
 }
 
-//void analyse_performance(TString dir = "../build/test/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
-void analyse_performance(TString dir = "../acts/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
+
+// bool isGoodSeed(int64_t layerMask, int minHits = 5, int shift = 3){
+//   int nSeeds[5] = {0,0,0,0,0}; // number of seeds per station
+//   int nSeedsB = (layerMask & (1ull << (shift -1))) > 0;
+//   int nSeedsF = (layerMask & (1ull << (7*4 + shift + 7))) > 0;
+//   for (int st=0;st<5;st++){
+//     nSeeds[st] += (layerMask & (1ull << (7*st + shift + 3))) > 0;
+//   }
+//   // printf("%d %d %d\n", nSeedsB, nSeeds[2], nSeedsF);
+//   if (nSeedsB<1) return 0;
+//   if (nSeedsF<1) return 0;
+//   // if (nSeeds[0]<1) return 0;
+//   if (nSeeds[2]<1) return 0;
+//   // if (nSeeds[4]<1) return 0;
+//   return 1;
+// }
+
+void analyse_performance(TString dir = "../build/test/", double etaMean = 1.9, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
+//void analyse_performance(TString dir = "../acts/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../pi90/acts/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../acts_pi_16/", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
   // gStyle->SetOptStat(0);
+  int shift = 3; //  isroc = 1;  isframe = 1;
   // setup particles
   TFile* fPart = new TFile(TString(dir + "particles.root"));
   TTree* tPart = (TTree*) fPart->Get("particles");
@@ -129,7 +141,7 @@ void analyse_performance(TString dir = "../acts/", double etaMean = 1.7, double 
       if (vMatched[ev][ip]<2) vMatched[ev][ip]=2;
       auto& layers = m_measurementLayer->at(it);
       int64_t trackFtdLayerMask = 0;
-      for (int il=0;il<layers.size();il++) trackFtdLayerMask |= (1ull << layers[il]);
+      for (int il=0;il<layers.size();il++) trackFtdLayerMask |= (1ull << (layers[il]-shift));
       for (int il=0;il<layers.size();il++) hLayers->Fill(layers[il]);
       if (trackable && !isGoodRecoFtd(trackFtdLayerMask)) continue;
       if (vMatched[ev][ip]<3) vMatched[ev][ip]=3;
@@ -173,7 +185,7 @@ void analyse_performance(TString dir = "../acts/", double etaMean = 1.7, double 
       int ip = meas_particles[i][2]-1;
       vMeasParticleIds[meas_event_id].back()[i] = ip;
       if (auto m = mapParticleFtdLayerMask.find(ip); m == mapParticleFtdLayerMask.end()) mapParticleFtdLayerMask[ip] = 0;
-      mapParticleFtdLayerMask[ip] |= (1ull << meas_layer_id);
+      mapParticleFtdLayerMask[ip] |= (1ull << (meas_layer_id-shift));
     }
   }
 

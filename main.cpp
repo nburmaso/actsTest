@@ -229,8 +229,8 @@ genCfg.numParticles = 1;
   // std::vector<std::pair<Acts::GeometryIdentifier, ActsExamples::DigiComponentsConfig>> elements = { {Acts::GeometryIdentifier{}, digiConfig} };
 
   // Digitization config
-  //ActsExamples::MyDigitizationAlgorithm::Config digiCfg;
-  ActsExamples::DigitizationAlgorithm::Config digiCfg;
+  ActsExamples::MyDigitizationAlgorithm::Config digiCfg;
+  //ActsExamples::DigitizationAlgorithm::Config digiCfg;
   digiCfg.inputSimHits = simhits;
   digiCfg.randomNumbers = rnd;
   digiCfg.outputMeasurements = measurements;
@@ -338,8 +338,8 @@ genCfg.numParticles = 1;
   //trackFindingCfg.reverseSearch = true;
   trackFindingCfg.inputMeasurements = measurements;
   trackFindingCfg.inputInitialTrackParameters = paramsEstimationCfg.outputTrackParameters;
-  trackFindingCfg.outputTracks = tracks;
-  //trackFindingCfg.outputTracks = ckf_tracks;
+  //trackFindingCfg.outputTracks = tracks;
+  trackFindingCfg.outputTracks = ckf_tracks;
   trackFindingCfg.trackingGeometry = trackingGeometry;
   trackFindingCfg.magneticField = fatrasCfg.magneticField;
   trackFindingCfg.measurementSelectorCfg = Acts::GeometryHierarchyMap(measSel);
@@ -358,9 +358,9 @@ genCfg.numParticles = 1;
   ActsExamples::GreedyAmbiguityResolutionAlgorithm::Config ambigResCfg;
   ambigResCfg.inputTracks = ckf_tracks;
   ambigResCfg.outputTracks = tracks;
-  ambigResCfg.nMeasurementsMin = 5;
+  ambigResCfg.nMeasurementsMin = 10;
   ambigResCfg.maximumSharedHits = 2;
-  ambigResCfg.maximumIterations = 1000;
+  ambigResCfg.maximumIterations = 10000;
 
   // Track truth matcher
   ActsExamples::TrackTruthMatcher::Config trackTruthMatcherCfg;
@@ -439,7 +439,7 @@ genCfg.numParticles = 1;
 
   // Sequencer config
   ActsExamples::Sequencer::Config sequencerCfg;
-  sequencerCfg.numThreads = 1;
+  sequencerCfg.numThreads = 12;
   sequencerCfg.events = nEvents;
   sequencerCfg.logLevel = logLevelF;
 
@@ -455,8 +455,8 @@ genCfg.numParticles = 1;
     sequencer.addReader(std::make_shared<ActsExamples::RootSimHitReader>(simhitReaderCfg, logLevel));
   }
 
-  sequencer.addAlgorithm(std::make_shared<ActsExamples::DigitizationAlgorithm>(digiCfg, logLevel));
-//  sequencer.addAlgorithm(std::make_shared<ActsExamples::MyDigitizationAlgorithm>(digiCfg, logLevel));
+//  sequencer.addAlgorithm(std::make_shared<ActsExamples::DigitizationAlgorithm>(digiCfg, logLevel));
+  sequencer.addAlgorithm(std::make_shared<ActsExamples::MyDigitizationAlgorithm>(digiCfg, logLevel));
 //  sequencer.addAlgorithm(std::make_shared<ActsExamples::SpacePointMaker>(spCfg, logLevel));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::MySpacePointMaker>(spCfg, logLevel));
 
@@ -465,7 +465,7 @@ genCfg.numParticles = 1;
 
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackFindingAlgorithm>(trackFindingCfg, logLevelF));
   // // //sequencer.addAlgorithm(std::make_shared<MyTrackFindingAlgorithm>(myTrackFindingCfg, logLevel));
-  // sequencer.addAlgorithm(std::make_shared<ActsExamples::GreedyAmbiguityResolutionAlgorithm>(ambigResCfg, logLevel));  
+  sequencer.addAlgorithm(std::make_shared<ActsExamples::GreedyAmbiguityResolutionAlgorithm>(ambigResCfg, logLevel));  
   // // // //   // sequencer.addAlgorithm(std::make_shared<ActsExamples::MyRefittingAlgorithm>(refitCfg, logLevel));
   sequencer.addAlgorithm(std::make_shared<ActsExamples::TrackTruthMatcher>(trackTruthMatcherCfg, logLevel));
 

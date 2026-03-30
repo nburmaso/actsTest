@@ -42,10 +42,7 @@ MyDigitizationAlgorithm::MyDigitizationAlgorithm(Config config, Acts::Logging::L
     GeometricConfig geoCfg;
     Acts::GeometryIdentifier geoId = m_cfg.digitizationConfigs.idAt(i);
     const auto& digiCfg = m_cfg.digitizationConfigs.valueAt(i);
-    geoCfg = digiCfg.geometricDigiConfig;
-    SmearingConfig smCfg = digiCfg.smearingDigiConfig;
-    smCfg.maxRetries = 100;
-    switch (smCfg.params.size()) {
+    switch (digiCfg.smearingDigiConfig.params.size()) {
       case 0u:
         digitizerInput.emplace_back(geoId, makeDigitizer<0u>(digiCfg));
         break;
@@ -97,28 +94,23 @@ ProcessCode MyDigitizationAlgorithm::execute(const AlgorithmContext& ctx) const 
         auto res = digitizer.smearing(rng, simHit, *surfacePtr, ctx.geoContext);
         const auto& [par, cov] = res.value();
         for (Eigen::Index ip = 0; ip < par.rows(); ++ip) {
-          //if (par.rows()==1) ACTS_VERBOSE("measurement = " << par[ip]);
           dParameters.indices.push_back(digitizer.smearing.indices[ip]);
           dParameters.values.push_back(par[ip]);
-          // if (par.rows()==1) {
-          //   dParameters.values.push_back(-par[ip]);
-          // } else {
-          //   dParameters.values.push_back(par[ip]);
-          // }
           dParameters.variances.push_back(cov(ip, ip));
         }
         auto measurement = createMeasurement(measurements, moduleGeoId, dParameters);
         measurementParticlesMap.emplace_hint(measurementParticlesMap.end(), measurement.index(), simHits.nth(simHitIdx)->particleId());
         measurementSimHitsMap.emplace_hint(measurementSimHitsMap.end(), measurement.index(), simHitIdx);
-        if (par.rows()==1 && 0) {
+        if (par.rows()==1 && m_cfg.doDuplicateStrawMeasurements) {
+          DigitizedParameters dParameters2;
           for (Eigen::Index ip = 0; ip < par.rows(); ++ip) {
-            dParameters.indices.push_back(digitizer.smearing.indices[ip]);
-            dParameters.values.push_back(-par[ip]);
-            dParameters.variances.push_back(cov(ip, ip));
+            dParameters2.indices.push_back(digitizer.smearing.indices[ip]);
+            dParameters2.values.push_back(-par[ip]);
+            dParameters2.variances.push_back(cov(ip, ip));
           }
-          auto measurement = createMeasurement(measurements, moduleGeoId, dParameters);
+          auto measurement = createMeasurement(measurements, moduleGeoId, dParameters2);
           measurementParticlesMap.emplace_hint(measurementParticlesMap.end(), measurement.index(), ActsFatras::Barcode());
-          measurementSimHitsMap.emplace_hint(measurementSimHitsMap.end(), measurement.index(), 0);
+          measurementSimHitsMap.emplace_hint(measurementSimHitsMap.end(), measurement.index(), simHitIdx);
         }
       }
     }, *digitizerItr);

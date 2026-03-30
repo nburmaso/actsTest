@@ -81,7 +81,10 @@ class MyDigitizationAlgorithm final : public IAlgorithm {
 
     /// Minimum number of attempts to derive a valid dgitized measurement when
     /// random numbers are involved.
-    std::size_t minMaxRetries = 10;
+    std::size_t minMaxRetries = 100;
+
+    // Create measurements mirrored to the opposite side of the straw wire
+    bool doDuplicateStrawMeasurements = true;
   };
 
   /// Construct the smearing algorithm.
