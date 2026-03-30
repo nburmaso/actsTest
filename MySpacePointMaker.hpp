@@ -31,6 +31,7 @@ class MySpacePointMaker final : public IAlgorithm {
     std::vector<Acts::GeometryIdentifier> geometrySelection;
     int maxDeltaStrawId{6};
     int minMeasPerCand{3};
+    double maxChi2{10.};
   };
 
   struct Candidate {

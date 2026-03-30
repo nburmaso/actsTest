@@ -245,13 +245,11 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       candidate.ty = ty;
       candidate.k = k;
       candidate.chi2 = chi2par;
-      if (iStation==0)
-        hChi2Ndf->Fill(chi2ndf);
       if (chi2ndf > m_cfg.maxChi2) {
         ACTS_VERBOSE("  erasing...");        
         it = candidates[iStation].erase(it);
       } else {
-        it++;
+        ++it;
       }
     }
 
