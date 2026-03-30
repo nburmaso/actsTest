@@ -245,11 +245,11 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       candidate.ty = ty;
       candidate.k = k;
       candidate.chi2 = chi2par;
-      if (chi2ndf > 10) {
+      if (chi2ndf > m_cfg.maxChi2) {
         ACTS_VERBOSE("  erasing...");        
         it = candidates[iStation].erase(it);
       } else {
-        it++;
+        ++it;
       }
     }
 
@@ -423,7 +423,7 @@ double ActsExamples::MySpacePointMaker::parabolic(
   int n = s.size();
   std::vector<double> sk(n, 0.);
   std::vector<double> ck(n, 0.);
-  auto fk = [&n,&s,&c,&z,&g,&tx,&ty,&sk,&ck](double kkk) {
+  auto fk = [n,&s,&c,&z,&g,&tx,&ty,&sk,&ck](double kkk) {
     double ss = 0;
     double sc = 0;
     double cc = 0;
@@ -438,9 +438,12 @@ double ActsExamples::MySpacePointMaker::parabolic(
       gs += g[i]*sk[i];
       gc += g[i]*ck[i];
     }
-    tx = (gc*sc - gs*cc)/(ss*cc - sc*sc);
-    ty = (gc*ss - gs*sc)/(ss*cc - sc*sc);
-
+    const double det = ss * cc - sc * sc;
+    if (std::abs(det) < 1e-12) {
+      return 1e12;
+    }
+    tx = (gc * sc - gs * cc) / det;
+    ty = (gc * ss - gs * sc) / det;
     double sum = 0;
     for (int i=0;i<n;i++){
       sum+=(tx*sk[i]-ty*ck[i]+g[i])*(ty*z[i]*s[i]+tx*z[i]*c[i]);
@@ -448,20 +451,33 @@ double ActsExamples::MySpacePointMaker::parabolic(
     return sum;
   };
 
-  double f0 = fk(0);
+  double f0 = fk(0.);
   double dk = 1e-7;
   double dfdk = (fk(dk)-f0)/dk;
   double kk = -2*f0/dfdk;
   double kmin = kk>0 ? 0  : kk;
   double kmax = kk>0 ? kk :  0;
+  double fkmin = fk(kmin);
+  double fkmax = fk(kmax);
   if (debug) printf("%f %f %f %f\n",kmin, kmax, fk(kmin), fk(kmax));
+
+  if (!(fkmin * fkmax < 0.))
+    return 1000.;
+
+  const int oldLevel = gErrorIgnoreLevel;
+  gErrorIgnoreLevel = kBreak; // suppress warnings
 
   ROOT::Math::Functor1D functor(fk);
   ROOT::Math::RootFinder rf(ROOT::Math::RootFinder::kGSL_BISECTION);
   rf.SetFunction(functor, kmin, kmax);
-  rf.Solve();
-  k = rf.Root();
-  if (debug) printf("k=%e %f iterations=%d\n", k, fk(k), rf.Iterations());
+  if (rf.Solve()) {
+    k = rf.Root();
+    if (debug) printf("k=%e %f iterations=%d\n", k, fk(k), rf.Iterations());
+  } else {
+    return 1000.;
+  }
+
+  gErrorIgnoreLevel = oldLevel;
 
   if (debug) { 
     printf("checking tx=%f ty=%f k=%f\n",tx, ty, k);
@@ -484,5 +500,4 @@ double ActsExamples::MySpacePointMaker::parabolic(
     chi2 += chi*chi;
   }
   return chi2;
-
 }
