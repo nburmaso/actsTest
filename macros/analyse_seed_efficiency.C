@@ -26,8 +26,8 @@ void analyse_seed_efficiency(TString dir = "../build/test", double etaMean = 1.9
 //void analyse_seed_efficiency(TString dir = "../acts", double etaMean = 1.9, double etaDif = 0.05, bool seedable = 1){
 //void analyse_seed_efficiency(TString dir = "../acts", double etaMean = 1.6, double etaDif = 0.05, bool seedable = 1){
   dir.Append("/");
-  // int shift = 0; //  isroc = 0;  isframe = 0;
-  int shift = 3; //  isroc = 1;  isframe = 1;
+  // int shift = 3; //  isroc = 1;  isframe = 1; with fake pre-layer
+  int shift = 2; //  isroc = 1;  isframe = 1; without fake pre-layer
 
   // setup particles
   TFile* fPart = new TFile(TString(dir + "particles.root"));

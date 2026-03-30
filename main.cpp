@@ -230,7 +230,7 @@ genCfg.numParticles = 1;
 
   // Digitization config
   ActsExamples::MyDigitizationAlgorithm::Config digiCfg;
-  digiCfg.doDuplicateStrawMeasurements = false;
+  digiCfg.doDuplicateStrawMeasurements = true;
   //ActsExamples::DigitizationAlgorithm::Config digiCfg;
   digiCfg.inputSimHits = simhits;
   digiCfg.randomNumbers = rnd;
@@ -256,7 +256,8 @@ genCfg.numParticles = 1;
   spCfg.inputMeasurements = measurements;
   spCfg.detector = detector;
   spCfg.maxDeltaStrawId = 6;
-  spCfg.minMeasPerCand = 3;
+  spCfg.minMeasPerCand = 4;
+  spCfg.maxChi2 = 20;
   spCfg.outputSpacePoints = spacepoints;
   spCfg.geometrySelection = {Acts::GeometryIdentifier{}};
 
@@ -271,12 +272,16 @@ genCfg.numParticles = 1;
   // truthSeedingCfg.deltaRMax = 100._mm;
 
   // Seeding
-  int iB = 0, iM = 18, iF = 36;
+  //int iB = 0, iM = 18, iF = 36;
   //int iB = 3, iM = 17, iF = 31;
   //int iB = 4, iM = 6, iF = 8;
   //int iB = 0, iM = 2, iF = 4;
   double rMaxStation = ftdGeo->GetLayerRMax(ftdGeo->GetNumberOfLayers()-1);
   auto positions = ftdGeo->GetLayerPositions();
+  int iB = 0;
+  int iM = ftdGeo->GetNumberOfLayers() / 2;
+  int iF = ftdGeo->GetNumberOfLayers() - 1;
+
   ActsExamples::SeedingAlgorithm::Config seedingCfg;
   seedingCfg.inputSpacePoints = {spacepoints};
   seedingCfg.outputSeeds = seeds;
@@ -359,7 +364,7 @@ genCfg.numParticles = 1;
   ActsExamples::GreedyAmbiguityResolutionAlgorithm::Config ambigResCfg;
   ambigResCfg.inputTracks = ckf_tracks;
   ambigResCfg.outputTracks = tracks;
-  ambigResCfg.nMeasurementsMin = 10;
+  ambigResCfg.nMeasurementsMin = 5;
   ambigResCfg.maximumSharedHits = 2;
   ambigResCfg.maximumIterations = 10000;
 

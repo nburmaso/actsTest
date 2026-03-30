@@ -318,15 +318,6 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     ACTS_VERBOSE("Selected candidates...");
     for (auto& id : selectedCandidateIds) {
       auto& sp = selectedCandidates[id];
-      // TODO read from config
-//       if (sp.station == 0) sp.z = 2070;
-// //      if (sp.station == 0) sp.z = 2120;
-// //      if (sp.station == 1) sp.z = 2340;
-//       else if (sp.station == 2) sp.z = 2560;
-// //      if (sp.station == 3) sp.z = 2780;
-//       else if (sp.station == 4) sp.z = 3050;
-//       else continue;
-// //      if (sp.station == 4) sp.z = 3000;
       if (sp.station==1 || sp.station==3) continue;
       Acts::SourceLink slink1{sp.sourceLinks[0]};
       Acts::SourceLink slink2{sp.sourceLinks[sp.sourceLinks.size()-1]};
@@ -337,13 +328,12 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       // printf("Candidate %d, meas: %d, shared: %d, chi2=%f\n", id, sp.sourceLinks.size(), sp.sharedMeasurements, sp.chi2);
       ACTS_VERBOSE("SP: k=" << sp.k << " x=" << sp.x << " y=" << sp.y << " z=" << sp.z << " var_xy=" << sp.varxy*sp.z*sp.z);
 
-
       boost::container::static_vector<Acts::SourceLink, 2> slinks = {slink1, slink2};
       Acts::Vector3 pos{sp.x,sp.y,sp.z};
       double var_r = (sp.x*sp.x*sp.varxx + sp.y*sp.y*sp.varyy + 2*sp.x*sp.y*sp.varxy)/(sp.x*sp.x+sp.y*sp.y);
       double var_z = 0.1;
-      //std::back_inserter(spacePoints) = SimSpacePoint(pos, 0, var_r, var_z, 0, slinks);
-      std::back_inserter(spacePoints) = SimSpacePoint(pos, sp.varxy*sp.z*sp.z*Acts::UnitConstants::ns, sp.varxx*sp.z*sp.z, sp.varyy*sp.z*sp.z, 0, slinks);
+      std::back_inserter(spacePoints) = SimSpacePoint(pos, 0, var_r, var_z, 0, slinks);
+      // std::back_inserter(spacePoints) = SimSpacePoint(pos, sp.varxy*sp.z*sp.z*Acts::UnitConstants::ns, sp.varxx*sp.z*sp.z, sp.varyy*sp.z*sp.z, 0, slinks);
     }
   }
 
@@ -452,17 +442,16 @@ double ActsExamples::MySpacePointMaker::parabolic(
   };
 
   double f0 = fk(0.);
-  double dk = 1e-7;
+  double dk = 1e-5;
   double dfdk = (fk(dk)-f0)/dk;
   double kk = -2*f0/dfdk;
+  double fkk = fk(kk);
+  if (!(f0 * fkk < 0.)) {
+    return 1000.;
+  }
   double kmin = kk>0 ? 0  : kk;
   double kmax = kk>0 ? kk :  0;
-  double fkmin = fk(kmin);
-  double fkmax = fk(kmax);
   if (debug) printf("%f %f %f %f\n",kmin, kmax, fk(kmin), fk(kmax));
-
-  if (!(fkmin * fkmax < 0.))
-    return 1000.;
 
   const int oldLevel = gErrorIgnoreLevel;
   gErrorIgnoreLevel = kBreak; // suppress warnings

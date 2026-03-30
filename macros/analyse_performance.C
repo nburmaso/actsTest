@@ -8,12 +8,16 @@
 #include "ActsFatras/EventData/Barcode.hpp"
 #include "tree_summary.C"
 
+const int nStations = 5;
+const int nLayersPerStation = 9;
+
+
 bool isGoodFtd(int64_t layerMask, int minHits = 5){
-  int nHits[5] = {0,0,0,0,0}; // number of hits per station
-  for (int st=0;st<5;st++){
-    for (int l=0;l<7;l++) {
-      if (l==3) continue;
-      nHits[st] += ((layerMask & (1ull << (7*st+l))) > 0);
+  vector<int> nHits(nStations,0); // number of hits per station
+  for (int st=0;st<nStations;st++){
+    for (int l=0;l<nLayersPerStation;l++) {
+      if (l==nLayersPerStation/2) continue;
+      nHits[st] += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
     }
   }
   // printf("%d %d %d %d %d\n",nHits[0],nHits[1],nHits[2],nHits[3],nHits[4]);
@@ -26,13 +30,14 @@ bool isGoodFtd(int64_t layerMask, int minHits = 5){
 }
 
 bool isGoodRecoFtd(int64_t layerMask, int minHits = 5){
-  int nHits[5] = {0,0,0,0,0}; // number of hits per station
-  for (int st=0;st<5;st++){
-    for (int l=0;l<7;l++) {
-      if (l==3) continue;
-      nHits[st] += ((layerMask & (1ull << (7*st+l))) > 0);
+  vector<int> nHits(nStations,0); // number of hits per station
+  for (int st=0;st<nStations;st++){
+    for (int l=0;l<nLayersPerStation;l++) {
+      if (l==nLayersPerStation/2) continue;
+      nHits[st] += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
     }
   }
+  if (nHits[0]+nHits[1]+nHits[2]+nHits[3]+nHits[4]<minHits) return 0;
   if (nHits[0]<1) return 0;
   if (nHits[1]<1) return 0;
   if (nHits[2]<1) return 0;
@@ -42,11 +47,11 @@ bool isGoodRecoFtd(int64_t layerMask, int minHits = 5){
 }
 
 bool isGoodSeed(int64_t layerMask, int minHits = 5){
-  int nSeeds[5] = {0,0,0,0,0}; // number of seeds per station
-  for (int st=0;st<5;st++){
-    for (int l=0;l<7;l++) {
-      if (l==3) continue;
-      nSeeds[st] += ((layerMask & (1ull << (7*st+l))) > 0);
+  vector<int> nSeeds(nStations,0); // number of hits per station
+  for (int st=0;st<nStations;st++){
+    for (int l=0;l<nLayersPerStation;l++) {
+      if (l==nLayersPerStation/2) continue;
+      nSeeds[st] += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
     }
   }
   if (nSeeds[0]<3) return 0;
@@ -76,8 +81,10 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.9, d
 //void analyse_performance(TString dir = "../acts/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../pi90/acts/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../acts_pi_16/", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
-  // gStyle->SetOptStat(0);
-  int shift = 3; //  isroc = 1;  isframe = 1;
+// gStyle->SetOptStat(0);
+
+  // int shift = 3; //  isroc = 1;  isframe = 1; with fake pre-layer
+  int shift = 2; //  isroc = 1;  isframe = 1; without fake pre-layer
   // setup particles
   TFile* fPart = new TFile(TString(dir + "particles.root"));
   TTree* tPart = (TTree*) fPart->Get("particles");
