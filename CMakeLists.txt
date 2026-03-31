@@ -60,7 +60,7 @@ link_directories(${PROJECT_LINK_DIRS})
 set(PROJECT_SOURCES
         MySpacePointMaker.cpp
         MyDigitizationAlgorithm.cpp
-        MyTrackFindingAlgorithm.cpp
+#        MyTrackFindingAlgorithm.cpp
         MyTrackWriter.cpp
         MyFtdGeo.cxx
         MyFtdDetector.cpp
@@ -70,7 +70,7 @@ set(PROJECT_SOURCES
 set(PROJECT_HEADERS
         MySpacePointMaker.hpp
         MyDigitizationAlgorithm.hpp
-        MyTrackFindingAlgorithm.hpp
+#        MyTrackFindingAlgorithm.hpp
         MyTrackWriter.hpp
         MyFtdGeo.h
         MyFtdDetector.h

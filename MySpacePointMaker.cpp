@@ -114,7 +114,7 @@ ActsExamples::MySpacePointMaker::MySpacePointMaker(Config cfg, Acts::Logging::Le
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "misc-no-recursion"
 ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const AlgorithmContext& ctx) const {
-  
+  ACTS_INFO("Starting my space point maker for event " << ctx.eventNumber);
   using ISL = IndexSourceLink;
   using FtdLayerTypes = MyFtdGeo::FtdLayerTypes;
 
