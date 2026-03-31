@@ -90,13 +90,13 @@ struct MyTrackFindingActor {
 
     int layer = surface->geometryId().layer();
     // TODO skip pixel-like surfaces using geo class
-    if (layer== 2) return;
-    if (layer== 6) return;
-    if (layer==13) return;
-    if (layer==20) return;
-    if (layer==27) return;
-    if (layer==34) return;
-    if (layer==38) return;
+    // if (layer== 2) return;
+    // if (layer== 6) return;
+    // if (layer==13) return;
+    // if (layer==20) return;
+    // if (layer==27) return;
+    // if (layer==34) return;
+    // if (layer==38) return;
     auto boundStateRes = stepper.boundState(state.stepping, *surface);
     auto& boundState = *boundStateRes;
     auto& [boundParams, jacobian, pathLength] = boundState;

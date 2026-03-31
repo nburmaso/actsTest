@@ -26,6 +26,7 @@ class MySpacePointMaker final : public IAlgorithm {
  public:
   struct Config {
     std::string inputMeasurements;
+    std::string inputMeasurementParticlesMap;
     std::string outputSpacePoints;
     std::shared_ptr<MyFtdDetector> detector{nullptr};
     std::vector<Acts::GeometryIdentifier> geometrySelection;
@@ -38,13 +39,14 @@ class MySpacePointMaker final : public IAlgorithm {
     std::vector<ActsExamples::IndexSourceLink> sourceLinks;
     int station = -1;
     double chi2 = -1;
+    double chi2ndf = -1;
     double tx = 0;
     double ty = 0;
     double k = 0;
     double varxx = 0;
     double varyy = 0;
     double varxy = 0;
-    int sharedMeasurements = 0;
+    int sharedStraws = 0;
     double x = 0;
     double y = 0;
     double z = 0;
@@ -65,6 +67,7 @@ class MySpacePointMaker final : public IAlgorithm {
   std::optional<IndexSourceLink::SurfaceAccessor> m_slSurfaceAccessor;
   Acts::SpacePointBuilder<SimSpacePoint> m_spacePointBuilder;
   ReadDataHandle<MeasurementContainer> m_inputMeasurements{this, "InputMeasurements"};
+  ReadDataHandle<MeasurementParticlesMap> m_inputMeasurementParticlesMap{this, "InputMeasurementParticlesMap"};
   WriteDataHandle<SimSpacePointContainer> m_outputSpacePoints{this, "OutputSpacePoints"};
 };
 }

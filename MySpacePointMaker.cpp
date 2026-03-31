@@ -38,6 +38,7 @@ ActsExamples::MySpacePointMaker::MySpacePointMaker(Config cfg, Acts::Logging::Le
   : IAlgorithm("MySpacePointMaker", lvl), m_cfg(std::move(cfg)) {
   m_inputMeasurements.initialize(m_cfg.inputMeasurements);
   m_outputSpacePoints.initialize(m_cfg.outputSpacePoints);
+  m_inputMeasurementParticlesMap.initialize(m_cfg.inputMeasurementParticlesMap);
 
   auto spConstructor =
       [](const Acts::Vector3& pos, std::optional<double> t,
@@ -57,6 +58,7 @@ ActsExamples::MySpacePointMaker::MySpacePointMaker(Config cfg, Acts::Logging::Le
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "misc-no-recursion"
 ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const AlgorithmContext& ctx) const {
+  
   using ISL = IndexSourceLink;
   using FtdLayerTypes = MyFtdGeo::FtdLayerTypes;
 
@@ -64,6 +66,14 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   std::shared_ptr<MyFtdDetector> det = m_cfg.detector;
 
   const auto& measurements = m_inputMeasurements(ctx);
+  const auto& measurementParticlesMap = m_inputMeasurementParticlesMap(ctx);
+
+  std::vector<int> particleIds(measurements.size());
+  for (auto meas : measurements) {
+    for (const auto& [_, barcode] : ActsExamples::makeRange(measurementParticlesMap.equal_range(meas.index()))) {
+      particleIds[meas.index()] = barcode.particle();
+    }
+  }
 
   // function to access measurement parameters using source links
   auto accessor = [&measurements](Acts::SourceLink slink) {
@@ -245,6 +255,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       candidate.ty = ty;
       candidate.k = k;
       candidate.chi2 = chi2par;
+      candidate.chi2ndf = chi2ndf;
       if (chi2ndf > m_cfg.maxChi2) {
         ACTS_VERBOSE("  erasing...");        
         it = candidates[iStation].erase(it);
@@ -256,14 +267,17 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     ACTS_VERBOSE("Start filtering...");        
     ACTS_VERBOSE("Collecting number of candidates per measurement...");        
     int nCandidates = candidates[iStation].size();
-    std::map<int,std::set<int>> candidatesPerMeasurement;
+    std::map<int,std::set<int>> candidatesPerStraw;
     std::vector<Candidate> selectedCandidates;    
     std::set<int> selectedCandidateIds;
     int i = 0;
     for (auto& candidate : candidates[iStation]){
       for (auto& isl : candidate.sourceLinks){
         int measId = isl.index();
-        candidatesPerMeasurement[measId].insert(i);
+        const auto geoId = isl.geometryId();
+        const auto layerId = geoId.layer();
+        const auto strawId = geoId.sensitive();
+        candidatesPerStraw[layerId*10000+strawId].insert(i);
       }
       selectedCandidates.push_back(candidate);
       selectedCandidateIds.insert(i);
@@ -275,22 +289,25 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       auto& candidate = selectedCandidates[i];
       for (auto& isl : candidate.sourceLinks){
         int measId = isl.index();
-        if (candidatesPerMeasurement[measId].size() > 1) {
-          candidate.sharedMeasurements++;
+        const auto geoId = isl.geometryId();
+        const auto layerId = geoId.layer();
+        const auto strawId = geoId.sensitive();
+        if (candidatesPerStraw[layerId*10000+strawId].size() > 1) {
+          candidate.sharedStraws++;
         }
       }
-      // printf("Candidate %d, meas: %d, shared: %d, chi2=%f\n", i, candidate.sourceLinks.size(), candidate.sharedMeasurements, candidate.chi2);
+      // printf("Candidate %d, meas: %d, shared: %d, chi2=%f\n", i, candidate.sourceLinks.size(), candidate.sharedStraws, candidate.chi2);
     }
 
-    auto sharedMeasurementsComperator = [&selectedCandidates](std::size_t a, std::size_t b) {
-      return selectedCandidates[a].sharedMeasurements < selectedCandidates[b].sharedMeasurements;
+    auto sharedStrawsComperator = [&selectedCandidates](std::size_t a, std::size_t b) {
+      return selectedCandidates[a].sharedStraws < selectedCandidates[b].sharedStraws;
     };
 
     auto candidateComperator =  [&selectedCandidates](std::size_t a, std::size_t b) {
       int nMeasA = selectedCandidates[a].sourceLinks.size();
       int nMeasB = selectedCandidates[b].sourceLinks.size();
-      auto relSharedA = 1.*selectedCandidates[a].sharedMeasurements/nMeasA;
-      auto relSharedB = 1.*selectedCandidates[b].sharedMeasurements/nMeasB;
+      auto relSharedA = 1.*selectedCandidates[a].sharedStraws/nMeasA;
+      auto relSharedB = 1.*selectedCandidates[b].sharedStraws/nMeasB;
       if (relSharedA != relSharedB) return relSharedA < relSharedB;
       if (nMeasA == nMeasB) return selectedCandidates[a].chi2 < selectedCandidates[b].chi2;
       return nMeasA > nMeasB;
@@ -299,19 +316,19 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     int maximumSharedHits = 1;
     for (int i = 0; i < 10000; i++) {
       if (selectedCandidateIds.empty()) break;
-      auto maximumSharedMeasurements = *std::max_element(selectedCandidateIds.begin(), selectedCandidateIds.end(), sharedMeasurementsComperator);
-      // printf("candidate %d with maximumSharedMeasurements=%d\n",maximumSharedMeasurements, selectedCandidates[maximumSharedMeasurements].sharedMeasurements);
-      if (selectedCandidates[maximumSharedMeasurements].sharedMeasurements <= maximumSharedHits) break;
+      auto maximumSharedStraws = *std::max_element(selectedCandidateIds.begin(), selectedCandidateIds.end(), sharedStrawsComperator);
+      // printf("candidate %d with maximumSharedMeasurements=%d\n",maximumSharedMeasurements, selectedCandidates[maximumSharedStraws].sharedStraws);
+      if (selectedCandidates[maximumSharedStraws].sharedStraws <= maximumSharedHits) break;
       auto badCandidate = *std::max_element(selectedCandidateIds.begin(), selectedCandidateIds.end(), candidateComperator);
       // printf("badCandidate=%d %zu\n",badCandidate, selectedCandidates[badCandidate].sourceLinks.size());
       // remove bad track
       for (auto& isl : selectedCandidates[badCandidate].sourceLinks) {
         int im = isl.index();
-        candidatesPerMeasurement[im].erase(badCandidate);
-        if (candidatesPerMeasurement[im].size()>1) continue;
+        candidatesPerStraw[im].erase(badCandidate);
+        if (candidatesPerStraw[im].size()>1) continue;
         // only one candidate left
-        auto it = *candidatesPerMeasurement[im].begin();
-        selectedCandidates[it].sharedMeasurements--;
+        auto it = *candidatesPerStraw[im].begin();
+        selectedCandidates[it].sharedStraws--;
       }
       selectedCandidateIds.erase(badCandidate);
     }
@@ -319,19 +336,28 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     for (auto& id : selectedCandidateIds) {
       auto& sp = selectedCandidates[id];
       if (sp.station==1 || sp.station==3) continue;
+      int nlinks = sp.sourceLinks.size();
+      printf("station %d particles: ", sp.station);
+      for (auto& isl : sp.sourceLinks){
+        int im = isl.index();
+        printf("%d ", particleIds[im]);
+      }
+      printf("\n");
       Acts::SourceLink slink1{sp.sourceLinks[0]};
-      Acts::SourceLink slink2{sp.sourceLinks[sp.sourceLinks.size()-1]};
+      Acts::SourceLink slink2{sp.sourceLinks[nlinks-1]};
       const Acts::Surface* surface = m_slSurfaceAccessor.value()(slink1);
       sp.z = surface->center(ctx.geoContext)[2];
       sp.x = sp.tx * sp.z + sp.k * sp.ty * sp.z * sp.z;
       sp.y = sp.ty * sp.z - sp.k * sp.tx * sp.z * sp.z;
-      // printf("Candidate %d, meas: %d, shared: %d, chi2=%f\n", id, sp.sourceLinks.size(), sp.sharedMeasurements, sp.chi2);
+      // printf("Candidate %d, meas: %d, shared: %d, chi2=%f\n", id, sp.sourceLinks.size(), sp.sharedStraws, sp.chi2);
       ACTS_VERBOSE("SP: k=" << sp.k << " x=" << sp.x << " y=" << sp.y << " z=" << sp.z << " var_xy=" << sp.varxy*sp.z*sp.z);
 
       boost::container::static_vector<Acts::SourceLink, 2> slinks = {slink1, slink2};
       Acts::Vector3 pos{sp.x,sp.y,sp.z};
       double var_r = (sp.x*sp.x*sp.varxx + sp.y*sp.y*sp.varyy + 2*sp.x*sp.y*sp.varxy)/(sp.x*sp.x+sp.y*sp.y);
       double var_z = 0.1;
+      if (var_r>1e-5) continue;
+      //std::back_inserter(spacePoints) = SimSpacePoint(pos, sp.chi2ndf*Acts::UnitConstants::ns, var_r, var_z, 0, slinks);
       std::back_inserter(spacePoints) = SimSpacePoint(pos, 0, var_r, var_z, 0, slinks);
       // std::back_inserter(spacePoints) = SimSpacePoint(pos, sp.varxy*sp.z*sp.z*Acts::UnitConstants::ns, sp.varxx*sp.z*sp.z, sp.varyy*sp.z*sp.z, 0, slinks);
     }

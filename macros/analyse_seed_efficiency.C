@@ -6,13 +6,18 @@
 #include "ActsFatras/EventData/Barcode.hpp"
 #include "../MyFtdDetector.h"
 
-bool isGoodFtd(int64_t layerMask, int minHits = 3){
-  int nHits[5] = {0,0,0,0,0}; // number of hits per station
-  for (int st=0;st<5;st++){
-    for (int l=0;l<7;l++) {
-      nHits[st] += ((layerMask & (1ull << (7*st+l))) > 0);
+const int nStations = 5;
+const int nLayersPerStation = 9;
+
+bool isGoodFtd(int64_t layerMask, int minHits = 5){
+  vector<int> nHits(nStations,0); // number of hits per station
+  for (int st=0;st<nStations;st++){
+    for (int l=0;l<nLayersPerStation;l++) {
+      if (l==nLayersPerStation/2) continue;
+      nHits[st] += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
     }
   }
+  // printf("%d %d %d %d %d\n",nHits[0],nHits[1],nHits[2],nHits[3],nHits[4]);
   if (nHits[0]<3) return 0;
   if (nHits[2]<3) return 0;
   if (nHits[4]<3) return 0;
@@ -150,7 +155,7 @@ void analyse_seed_efficiency(TString dir = "../build/test", double etaMean = 1.9
 
   new TCanvas;
   auto hEffPtPi = (TH1D*) hRcPtPi->Clone("hEffPtPi");
-  hEffPtPi->Divide(hRcPtPi, hMcPtPi, 1, 1, "B");
+//  hEffPtPi->Divide(hRcPtPi, hMcPtPi, 1, 1, "B");
   hEffPtPi->Draw();
 
   if (0) {

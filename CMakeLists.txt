@@ -60,7 +60,7 @@ add_executable(${PROJECT_NAME}
         main.cpp
         MySpacePointMaker.cpp 
         MyDigitizationAlgorithm.cpp
-#        MyTrackFindingAlgorithm.cpp
+        MyTrackFindingAlgorithm.cpp
         MyTrackWriter.cpp
         MyFtdGeo.cxx
         MyFtdDetector.cpp
