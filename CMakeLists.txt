@@ -70,6 +70,7 @@ set(PROJECT_SOURCES
 set(PROJECT_HEADERS
         MySpacePointMaker.hpp
         MyDigitizationAlgorithm.hpp
+        MyTrackFindingAlgorithm.hpp
         MyTrackWriter.hpp
         MyFtdGeo.h
         MyFtdDetector.h
