@@ -21,11 +21,11 @@ bool isGoodFtd(int64_t layerMask, int minHits = 5){
     }
   }
   // printf("%d %d %d %d %d\n",nHits[0],nHits[1],nHits[2],nHits[3],nHits[4]);
-  if (nHits[0]<3) return 0;
-  if (nHits[1]<3) return 0;
-  if (nHits[2]<3) return 0;
-  if (nHits[3]<3) return 0;
-  if (nHits[4]<3) return 0;
+  if (nHits[0]<4) return 0;
+  if (nHits[1]<4) return 0;
+  if (nHits[2]<4) return 0;
+  if (nHits[3]<4) return 0;
+  if (nHits[4]<4) return 0;
   return 1;
 }
 
@@ -54,9 +54,9 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5){
       nSeeds[st] += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
     }
   }
-  if (nSeeds[0]<3) return 0;
-  if (nSeeds[2]<3) return 0;
-  if (nSeeds[4]<3) return 0;
+  if (nSeeds[0]<4) return 0;
+  if (nSeeds[2]<4) return 0;
+  if (nSeeds[4]<4) return 0;
   return 1;
 }
 
@@ -212,6 +212,10 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.9, d
   TH1D* hSeedPtPr = new TH1D("hSeedPtPr","",100,0.,1.);
   TH1D* hSeedPhiPi = new TH1D("hSeedPhiPi","",180,-M_PI,M_PI);
   TH1D* hSeedPhiPr = new TH1D("hSeedPhiPr","",180,-M_PI,M_PI);
+  TH1D* hSeedablePtPi = new TH1D("hSeedablePtPi","",100,0.,1.);
+  TH1D* hSeedablePtPr = new TH1D("hSeedablePtPr","",100,0.,1.);
+  TH1D* hSeedablePhiPi = new TH1D("hSeedablePhiPi","",180,-M_PI,M_PI);
+  TH1D* hSeedablePhiPr = new TH1D("hSeedablePhiPr","",180,-M_PI,M_PI);
 
   printf("loop over seeds\n");
   int previous_seed_event_id = -1;
@@ -263,6 +267,10 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.9, d
       float eta = part_eta->at(ip);
       float phi = part_phi->at(ip);    
       if (abs(eta-etaMean)>etaDif || abs(vz)>1.) continue;
+      if (abs(pdg)== 211) hSeedablePtPi->Fill(pt);
+      if (abs(pdg)==2212) hSeedablePtPr->Fill(pt);
+      if (abs(pdg)== 211) hSeedablePhiPi->Fill(phi);
+      if (abs(pdg)==2212) hSeedablePhiPr->Fill(phi);
       if (vSeeds[ev][ip]==0) continue;
       if (vSeeds[ev][ip]>1) printf("Warning: seeds = %d\n",vSeeds[ev][ip]);
       if (abs(pdg)== 211) hSeedPtPi->Fill(pt);
@@ -285,6 +293,7 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.9, d
   hEffPtPi->Draw();
   double nBest = hRcPtPi->Integral();
   double nSeeds = hSeedPtPi->Integral();
+  double nSeedable = hSeedablePtPi->Integral();
   printf("nBest/nSeeds=%f\n",nBest/nSeeds);
   new TCanvas;
   int nRc = hNumberOfMatchedPi->Integral();
@@ -293,4 +302,10 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.9, d
   hNumberOfMatchedPi->Draw();
   new TCanvas;
   hNLayers->Draw();
+
+  new TCanvas;
+  auto hSeedEffPtPi = (TH1D*) hSeedPtPi->Clone("hSeedEffPtPi");
+  hSeedEffPtPi->Divide(hSeedPtPi, hSeedablePtPi, 1, 1, "B");
+  hSeedEffPtPi->Draw();
+  printf("nSeeds/nSeedable=%f\n",nSeeds/nSeedable);
 }

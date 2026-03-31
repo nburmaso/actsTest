@@ -18,9 +18,9 @@ bool isGoodFtd(int64_t layerMask, int minHits = 5){
     }
   }
   // printf("%d %d %d %d %d\n",nHits[0],nHits[1],nHits[2],nHits[3],nHits[4]);
-  if (nHits[0]<3) return 0;
-  if (nHits[2]<3) return 0;
-  if (nHits[4]<3) return 0;
+  if (nHits[0]<4) return 0;
+  if (nHits[2]<4) return 0;
+  if (nHits[4]<4) return 0;
   return 1;
 }
 
