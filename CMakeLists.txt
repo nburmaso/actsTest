@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.17)
 project(actsTest)
 
+include(GNUInstallDirs)
+
 # soft installation path
 set(SW $ENV{HOME}/mpd/sw/ubuntu2404_x86-64)
 set(ACTS_SRC ${SW}/ACTS/latest)
@@ -55,19 +57,26 @@ include_directories(${PROJECT_INCLUDE_DIRS})
 
 link_directories(${PROJECT_LINK_DIRS})
 
-# main exec
-add_executable(${PROJECT_NAME} 
-        main.cpp
-        MySpacePointMaker.cpp 
+set(PROJECT_SOURCES
+        MySpacePointMaker.cpp
         MyDigitizationAlgorithm.cpp
         MyTrackFindingAlgorithm.cpp
         MyTrackWriter.cpp
         MyFtdGeo.cxx
         MyFtdDetector.cpp
         BaseTpcSectorGeo.cxx
-        )
+)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC
+set(PROJECT_HEADERS
+        MySpacePointMaker.hpp
+        MyDigitizationAlgorithm.hpp
+        MyTrackWriter.hpp
+        MyFtdGeo.h
+        MyFtdDetector.h
+        BaseTpcSectorGeo.h
+)
+
+set(PROJECT_LINK_LIBS
         ActsCore
         ActsFatras
         ActsPluginGeant4
@@ -89,4 +98,38 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
         tbb
         ${Geant4_LIBRARIES}
         ${ROOT_LIBRARIES}
+)
+
+# add dynamic library
+add_library(actsTestLib SHARED
+        ${PROJECT_SOURCES}
+        ${PROJECT_HEADERS}
+)
+
+target_include_directories(actsTestLib
+        PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        PRIVATE
+        ${PROJECT_INCLUDE_DIRS}
+)
+
+target_link_libraries(actsTestLib PUBLIC ${PROJECT_LINK_LIBS})
+
+# main exec
+add_executable(${PROJECT_NAME} main.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE actsTestLib)
+
+set(CMAKE_INSTALL_LIBDIR lib)
+set(CMAKE_INSTALL_INCLUDEDIR include)
+set(CMAKE_INSTALL_PREFIX $ENV{PWD}/stage)
+
+install(TARGETS actsTestLib
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(FILES ${PROJECT_HEADERS}
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )

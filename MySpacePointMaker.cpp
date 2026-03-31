@@ -34,6 +34,62 @@
 #include "Math/Functor.h"
 #include "Math/RootFinder.h"
 
+// helper namespace
+namespace {
+  struct FunctorFk {
+    int n;
+    double tx;
+    double ty;
+    std::vector<double>* z{nullptr};
+    std::vector<double>* s{nullptr};
+    std::vector<double>* c{nullptr};
+    std::vector<double>* g{nullptr};
+    std::vector<double>* sk{nullptr};
+    std::vector<double>* ck{nullptr};
+    double operator() (double kkk) {
+      double ss = 0;
+      double sc = 0;
+      double cc = 0;
+      double gs = 0;
+      double gc = 0;
+      for (int i=0;i<n;i++){
+        sk->at(i) = (s->at(i) + kkk*z->at(i)*c->at(i));
+        ck->at(i) = (c->at(i) - kkk*z->at(i)*s->at(i));
+        ss += sk->at(i)*sk->at(i);
+        sc += sk->at(i)*ck->at(i);
+        cc += ck->at(i)*ck->at(i);
+        gs += g->at(i)*sk->at(i);
+        gc += g->at(i)*ck->at(i);
+      }
+      const double det = ss * cc - sc * sc;
+      if (std::abs(det) < 1e-12) {
+        return 1e12;
+      }
+      tx = (gc * sc - gs * cc) / det;
+      ty = (gc * ss - gs * sc) / det;
+      double sum = 0;
+      for (int i=0;i<n;i++){
+        sum+=(tx*sk->at(i)-ty*ck->at(i)+g->at(i))*(ty*z->at(i)*s->at(i)+tx*z->at(i)*c->at(i));
+      }
+      return sum;
+    }
+  };
+
+  ROOT::Math::RootFinder& parabolicRF() {
+    static thread_local ROOT::Math::RootFinder rf(ROOT::Math::RootFinder::kGSL_BISECTION);
+    return rf;
+  }
+
+  struct IslCmp {
+    bool operator() (const ActsExamples::IndexSourceLink& lhs,
+                     const ActsExamples::IndexSourceLink& rhs) const {
+      if (lhs.geometryId() < rhs.geometryId()) return true;
+      if (rhs.geometryId() < lhs.geometryId()) return false;
+      return lhs.index() < rhs.index();
+    }
+  };
+}
+
 ActsExamples::MySpacePointMaker::MySpacePointMaker(Config cfg, Acts::Logging::Level lvl)
   : IAlgorithm("MySpacePointMaker", lvl), m_cfg(std::move(cfg)) {
   m_inputMeasurements.initialize(m_cfg.inputMeasurements);
@@ -91,11 +147,20 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   int nLayPerSt = ftdGeo->GetNLayersPerStation();
   int nLayers = ftdGeo->GetNumberOfLayers();
 
+  std::map<ISL, std::tuple<Acts::Vector3, double, double, double>, IslCmp> islToXyzRot;
+
   std::vector<std::list<ISL>> mesPerLay(nLayers);
-  for (auto& isl : measurements.orderedIndices()) {
+  for (const auto& isl : measurements.orderedIndices()) {
     const auto geoId = isl.geometryId();
     int iLayer = det->GeoIdToFtdLayer(geoId);
     mesPerLay[iLayer].emplace_back(isl);
+    Acts::SourceLink slink{isl};
+    // tube center shifted by the measured distance to wire
+    const Acts::Surface* surface = m_slSurfaceAccessor.value()(slink);
+    const auto [par, cov] = accessor(slink);
+    auto xyz = surface->localToGlobal(ctx.geoContext, Acts::Vector2(par[0],0), Acts::Vector3());
+    auto rot = surface->transform(ctx.geoContext).rotation();
+    islToXyzRot[isl] = std::make_tuple(xyz, rot(0,1), rot(0,0), cov(0,0));
   }
 
   for (int iL = 0; iL < nLayers; ++iL) {
@@ -103,17 +168,22 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     mesList.sort([](const ISL& a, const ISL& b) { return a.geometryId() < b.geometryId(); });
   }
 
-  int maxDeltaStrawId = m_cfg.maxDeltaStrawId;
-  int minMeasPerCand = m_cfg.minMeasPerCand;
-
   // iterate through layer measurements recursively
   auto constructCands = [&](auto&& self,
                             int layerId,
                             int station,
+                            int maxDeltaStrawId,
+                            int minMeasPerCand,
                             std::list<Candidate>& cands,
                             Candidate& cand,
                             ISL const* prevIsl) -> void
   {
+    // not enough measurements found and not enough layers left to check
+    if ((cand.sourceLinks.size() < minMeasPerCand) &&
+        (nLayPerSt - (layerId % nLayPerSt) < (minMeasPerCand - static_cast<int>(cand.sourceLinks.size())))) {
+      return;
+    }
+
     // reached end of layers or another station -> store completed candidate
     if (ftdGeo->GetLayerStation(layerId) != station || layerId >= nLayers) {
       if (cand.sourceLinks.size() >= minMeasPerCand)
@@ -123,7 +193,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
 
     // skip fake pixel layers
     if (ftdGeo->GetLayerType(layerId) == FtdLayerTypes::kPixel) {
-      self(self, layerId + 1, station, cands, cand, prevIsl);
+      self(self, layerId + 1, station, maxDeltaStrawId, minMeasPerCand, cands, cand, prevIsl);
       return;
     }
 
@@ -133,7 +203,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       // first layer we touch for this candidate -> try all measurements on this layer
       for (ISL& isl : curLayerList) {
         cand.sourceLinks.push_back(isl);
-        self(self, layerId + 1, station, cands, cand, &cand.sourceLinks.back());
+        self(self, layerId + 1, station, maxDeltaStrawId, minMeasPerCand, cands, cand, &cand.sourceLinks.back());
         cand.sourceLinks.pop_back(); // go back
       }
     } else {
@@ -148,10 +218,10 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
         if (strawId > centerStrawId + maxDeltaStrawId)
           break;
         cand.sourceLinks.push_back(*it);
-        self(self, layerId + 1, station, cands, cand, &cand.sourceLinks.back());
+        self(self, layerId + 1, station, maxDeltaStrawId, minMeasPerCand, cands, cand, &cand.sourceLinks.back());
         cand.sourceLinks.pop_back(); // go back
       }
-      self(self, layerId + 1, station, cands, cand, prevIsl);
+      self(self, layerId + 1, station, maxDeltaStrawId, minMeasPerCand, cands, cand, prevIsl);
     }
   };
 
@@ -162,10 +232,15 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     if (layerType == FtdLayerTypes::kPixel) continue;
     int station = ftdGeo->GetLayerStation(iL);
     // if (station > 0) continue;
+    if (station==1 || station==3) continue;
     auto& candList = candidates[station];
     Candidate cand;  // starts empty
     cand.station = station;
-    constructCands(constructCands, iL, station, candList, cand, nullptr);
+    int maxDeltaStrawId;
+    if (station == 0) maxDeltaStrawId = m_cfg.maxDeltaStrawId1;
+    if (station == 2) maxDeltaStrawId = m_cfg.maxDeltaStrawId2;
+    if (station == 4) maxDeltaStrawId = m_cfg.maxDeltaStrawId3;
+    constructCands(constructCands, iL, station, maxDeltaStrawId, m_cfg.minMeasPerCand, candList, cand, nullptr);
   }
 
   // construct everything else
@@ -222,22 +297,20 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
         const auto geoId = isl.geometryId();
         const auto layerId = geoId.layer();
         const auto strawId = geoId.sensitive();
-        Acts::SourceLink slink{isl};
-        const auto [par, cov] = accessor(slink);
-        // tube center shifted by the measured distance to wire
-        const Acts::Surface* surface = m_slSurfaceAccessor.value()(slink);
-        auto xyz = surface->localToGlobal(ctx.geoContext, Acts::Vector2(par[0],0), Acts::Vector3());
-        auto rot = surface->transform(ctx.geoContext).rotation();
+        auto itXR = islToXyzRot.find(isl);
+        if (itXR == islToXyzRot.end())
+          continue;
+        auto& cachedXyzParCov = itXR->second;
+        auto xyz = std::get<0>(cachedXyzParCov);
         double x = xyz[0];
         double y = xyz[1];
-        double cosp = rot(0,1);
-        double sinp = rot(0,0);
-
+        double cosp = std::get<1>(cachedXyzParCov);
+        double sinp = std::get<2>(cachedXyzParCov);
         z[i] = xyz[2];
         s[i] = z[i]*sinp;
         c[i] = z[i]*cosp;
         g[i] = -x*sinp + y*cosp;
-        d[i] = sqrt(cov(0,0));
+        d[i] = sqrt(std::get<3>(cachedXyzParCov));
       }
       double txl, tyl, varxx, varyy, varxy;
       double chi2lin = linear(s, c, g, d, txl, tyl, varxx, varyy, varxy, 0);
@@ -439,33 +512,15 @@ double ActsExamples::MySpacePointMaker::parabolic(
   int n = s.size();
   std::vector<double> sk(n, 0.);
   std::vector<double> ck(n, 0.);
-  auto fk = [n,&s,&c,&z,&g,&tx,&ty,&sk,&ck](double kkk) {
-    double ss = 0;
-    double sc = 0;
-    double cc = 0;
-    double gs = 0;
-    double gc = 0;
-    for (int i=0;i<n;i++){
-      sk[i] = (s[i] + kkk*z[i]*c[i]);
-      ck[i] = (c[i] - kkk*z[i]*s[i]);
-      ss += sk[i]*sk[i];
-      sc += sk[i]*ck[i];
-      cc += ck[i]*ck[i];
-      gs += g[i]*sk[i];
-      gc += g[i]*ck[i];
-    }
-    const double det = ss * cc - sc * sc;
-    if (std::abs(det) < 1e-12) {
-      return 1e12;
-    }
-    tx = (gc * sc - gs * cc) / det;
-    ty = (gc * ss - gs * sc) / det;
-    double sum = 0;
-    for (int i=0;i<n;i++){
-      sum+=(tx*sk[i]-ty*ck[i]+g[i])*(ty*z[i]*s[i]+tx*z[i]*c[i]);
-    }
-    return sum;
-  };
+
+  FunctorFk fk;
+  fk.n = n;
+  fk.z = &z;
+  fk.s = &s;
+  fk.c = &c;
+  fk.g = &g;
+  fk.sk = &sk;
+  fk.ck = &ck;
 
   double f0 = fk(0.);
   double dk = 1e-5;
@@ -487,6 +542,9 @@ double ActsExamples::MySpacePointMaker::parabolic(
   rf.SetFunction(functor, kmin, kmax);
   if (rf.Solve()) {
     k = rf.Root();
+    double froot = fk(k);
+    tx = fk.tx;
+    ty = fk.ty;
     if (debug) printf("k=%e %f iterations=%d\n", k, fk(k), rf.Iterations());
   } else {
     return 1000.;
