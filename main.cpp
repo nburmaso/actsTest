@@ -52,7 +52,7 @@ int main(int argc, char *argv[]){
   TString inputDir = "none";
   TString outputDir = "test";
 //  TString outputDir = "roc_pi_16_7deg";
-  int nEvents = 1000;
+  int nEvents = 10000 ;
   //Acts::PdgParticle pdgCode = Acts::eProton;
   Acts::PdgParticle pdgCode = Acts::ePionPlus;
   double etaMin = 1.6;
@@ -129,37 +129,23 @@ int main(int argc, char *argv[]){
   genCfg.etaUniform = true;
   genCfg.pTransverse = true;
   genCfg.pdg = pdgCode;
-  // genCfg.thetaMin = 2 * atan(exp(-etaMax));
-  // genCfg.thetaMax = 2 * atan(exp(-etaMin));
-  // genCfg.pMin = 0.2;
-  genCfg.pMin = 0.2;
-  genCfg.pMax = 1.0;
-  // genCfg.pMin = 0.5;
-  // genCfg.pMax = 0.501;
   // genCfg.phiMin = M_PI/180.*45.;
   // genCfg.phiMax = M_PI/180.*45.00001;
 
-  // central UrQMD-like occupancy
-  // genCfg.thetaMin = 2 * atan(exp(-1.9001));
-  // genCfg.thetaMax = 2 * atan(exp(-1.90));
+  // genCfg.thetaMin = 2 * atan(exp(-etaMax));
+  // genCfg.thetaMax = 2 * atan(exp(-etaMin));
+  // genCfg.thetaMin = 2 * atan(exp(-1.61));
+  // genCfg.thetaMax = 2 * atan(exp(-1.60));
   // genCfg.thetaMin = 2 * atan(exp(-1.91));
   // genCfg.thetaMax = 2 * atan(exp(-1.90));
   genCfg.thetaMin = 2 * atan(exp(-1.95));
   genCfg.thetaMax = 2 * atan(exp(-1.55));
-  // genCfg.thetaMin = 2 * atan(exp(-1.76));
-  // genCfg.thetaMax = 2 * atan(exp(-1.74));
-  // genCfg.thetaMin = 2 * atan(exp(-1.93));
-  // genCfg.thetaMax = 2 * atan(exp(-1.91));
-  // genCfg.thetaMin = 2 * atan(exp(-1.59));
-  // genCfg.thetaMax = 2 * atan(exp(-1.57));
-  // genCfg.thetaMin = 0.35;
-  // genCfg.thetaMax = 0.350001;
-  // genCfg.pMin = 1.2;
-  // genCfg.pMax = 1.21;
+
+  genCfg.pMin = 0.2;
+  genCfg.pMax = 1.0;
+
   genCfg.randomizeCharge = true;
-//  genCfg.numParticles = 1;
-  genCfg.numParticles = 10;
-//  genCfg.numParticles = 1;
+  genCfg.numParticles = 1;
   ActsExamples::EventGenerator::Generator gen{
       std::make_shared<ActsExamples::FixedMultiplicityGenerator>(1),
       std::make_shared<ActsExamples::FixedPrimaryVertexPositionGenerator>(),
@@ -233,8 +219,8 @@ int main(int argc, char *argv[]){
 
   // Digitization config
   ActsExamples::MyDigitizationAlgorithm::Config digiCfg;
-//  digiCfg.doDuplicateStrawMeasurements = false;
-  digiCfg.doDuplicateStrawMeasurements = true;
+  digiCfg.doDuplicateStrawMeasurements = false;
+//  digiCfg.doDuplicateStrawMeasurements = true;
   //ActsExamples::DigitizationAlgorithm::Config digiCfg;
   digiCfg.inputSimHits = simhits;
   digiCfg.randomNumbers = rnd;
@@ -260,12 +246,12 @@ int main(int argc, char *argv[]){
   spCfg.inputMeasurements = measurements;
   spCfg.inputMeasurementParticlesMap = measurement_particles_map;
   spCfg.detector = detector;
-  spCfg.maxLoDeltaPStrawId1 = 1;  spCfg.maxLoDeltaMStrawId1 = 1;  // ST0
+  spCfg.maxLoDeltaPStrawId1 = 0;  spCfg.maxLoDeltaMStrawId1 = 1;  // ST0
+  spCfg.maxLoDeltaPStrawId2 = 0;  spCfg.maxLoDeltaMStrawId2 = 1;  // ST2
+  spCfg.maxLoDeltaPStrawId3 = 0;  spCfg.maxLoDeltaMStrawId3 = 1;  // ST4
   spCfg.maxHiDeltaPStrawId1 = 4;  spCfg.maxHiDeltaMStrawId1 = 6;  // ST0
-  spCfg.maxLoDeltaPStrawId2 = 1;  spCfg.maxLoDeltaMStrawId2 = 1;  // ST2
-  spCfg.maxHiDeltaPStrawId2 = 6;  spCfg.maxHiDeltaMStrawId2 = 8;  // ST2
-  spCfg.maxLoDeltaPStrawId3 = 1;  spCfg.maxLoDeltaMStrawId3 = 1;  // ST4
-  spCfg.maxHiDeltaPStrawId3 = 8;  spCfg.maxHiDeltaMStrawId3 = 10; // ST4
+  spCfg.maxHiDeltaPStrawId2 = 5;  spCfg.maxHiDeltaMStrawId2 = 8;  // ST2
+  spCfg.maxHiDeltaPStrawId3 = 6;  spCfg.maxHiDeltaMStrawId3 = 10; // ST4
   spCfg.minMeasPerCand = 3;
   spCfg.maxChi2 = 10;
   spCfg.maximumIterations = 100000;
@@ -502,7 +488,7 @@ int main(int argc, char *argv[]){
   sequencer.addWriter(std::make_shared<ActsExamples::RootMeasurementWriter>(measWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootSpacepointWriter>(spWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootSeedWriter>(seedWriterCfg, logLevel));
-  sequencer.addWriter(std::make_shared<ActsExamples::RootTrackParameterWriter>(paramWriterCfg, logLevelV));
+  sequencer.addWriter(std::make_shared<ActsExamples::RootTrackParameterWriter>(paramWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackStatesWriter>(trackStatesWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackSummaryWriter>(trackSummaryWriterCfg, logLevel));
   // sequencer.addWriter(std::make_shared<MyTrackWriter>(trackWriterCfg, logLevel));
