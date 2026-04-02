@@ -17,7 +17,7 @@ const int nStations = 5;
 const int nLayersPerStation = 9;
 const int shift = 2;
 
-void analyse_measurements(int selected_station = 4){
+void analyse_measurements(int selected_station = 2){
   gStyle->SetOptStat(0);
   TFile* fMeas = new TFile("../build/test/measurements.root");
   TTree* tMeas = (TTree*) fMeas->Get("measurements");
