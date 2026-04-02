@@ -62,11 +62,9 @@ class MySpacePointMaker final : public IAlgorithm {
   ProcessCode execute(const AlgorithmContext& ctx) const override;
   const Config& config() const { return m_cfg; }
 
-  double linear(std::vector<double> &s, std::vector<double> &c, std::vector<double> &g, std::vector<double> &d, 
-                double &tx, double &ty, double &varxx, double &varyy, double &varxy, bool debug = 0) const;
+  double linear(Candidate& cand, const std::vector<std::array<double, 4>>& cacheZSCGD, bool debug = 0) const;
   
-  double parabolic(std::vector<double> &z, std::vector<double> &s, std::vector<double> &c, std::vector<double> &g, 
-               std::vector<double> &d, double &tx, double &ty, double &k, bool debug = 0) const;
+  double parabolic(Candidate& cand, const std::vector<std::array<double, 4>>& cacheZSCGD, bool debug = 0) const;
 
  private:
   Config m_cfg;
