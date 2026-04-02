@@ -35,6 +35,9 @@ public:
   double GetLayerRMax(int iLayer) const { return fLayerRMax[iLayer]; }
 
   const std::vector<double>& GetLayerPositions() const { return fLayerPositions; }
+  const std::vector<int>& GetLayerNumbersOfTubes() const { return fLayerNumberOfTubes; }
+  const std::vector<int>& GetLayerTypes() const { return fLayerType; }
+
   int    GetLayerNumberOfTubes(int iLayer) const { return fLayerNumberOfTubes[iLayer]; }
   double GetLayerPosition(int iLayer) const { return fLayerPositions[iLayer]; }
   double GetLayerThickness(int iLayer) const { return fLayerThickness[iLayer]; }

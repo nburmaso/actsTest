@@ -30,9 +30,12 @@ class MySpacePointMaker final : public IAlgorithm {
     std::string outputSpacePoints;
     std::shared_ptr<MyFtdDetector> detector{nullptr};
     std::vector<Acts::GeometryIdentifier> geometrySelection;
-    int maxDeltaStrawId1{6};
-    int maxDeltaStrawId2{6};
-    int maxDeltaStrawId3{12};
+    int maxLoDeltaStrawId1{2};
+    int maxLoDeltaStrawId2{2};
+    int maxLoDeltaStrawId3{2};
+    int maxHiDeltaStrawId1{6};
+    int maxHiDeltaStrawId2{6};
+    int maxHiDeltaStrawId3{12};
     int minMeasPerCand{3};
     double maxChi2{10.};
     int maximumIterations{10000};

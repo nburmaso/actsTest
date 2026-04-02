@@ -115,60 +115,65 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     cacheZSCGD[isl.index()][4] = sqrt(cov(0,0));   // d
   }
 
+  const std::vector<int>& nTubesPerLayer = ftdGeo->GetLayerNumbersOfTubes();
+  const std::vector<int>& layerTypes = ftdGeo->GetLayerTypes();
+  auto vActsLayerToFtdLayer = det->GetActsLayerToFtdLayer();
+
   // iterate through layer measurements recursively
   auto constructCands = [&](auto&& self,
                             int layerId,
                             int station,
-                            int maxDeltaStrawId,
+                            int maxLoDeltaStrawId,
+                            int maxHiDeltaStrawId,
                             int minMeasPerCand,
                             std::list<Candidate>& cands,
                             Candidate& cand,
-                            ISL const* prevIsl) -> void
+                            ISL const* firstIsl) -> void
   {
     // not enough measurements found and not enough layers left to check
     if ((cand.sourceLinks.size() < minMeasPerCand) &&
         (nLayPerSt - (layerId % nLayPerSt) < (minMeasPerCand - static_cast<int>(cand.sourceLinks.size())))) {
       return;
     }
-
     // reached end of layers or another station -> store completed candidate
     if (ftdGeo->GetLayerStation(layerId) != station || layerId >= nLayers) {
       if (cand.sourceLinks.size() >= minMeasPerCand)
         cands.emplace_back(cand);
       return;
     }
-
     // skip fake pixel layers
     if (ftdGeo->GetLayerType(layerId) == FtdLayerTypes::kPixel) {
-      self(self, layerId + 1, station, maxDeltaStrawId, minMeasPerCand, cands, cand, prevIsl);
+      self(self, layerId + 1, station, maxLoDeltaStrawId, maxHiDeltaStrawId, minMeasPerCand, cands, cand, firstIsl);
       return;
     }
-
     auto& curLayerList = mesPerLay[layerId];
-
-    if (prevIsl == nullptr) {
-      // first layer we touch for this candidate -> try all measurements on this layer
-      for (ISL& isl : curLayerList) {
+    if (firstIsl == nullptr) {
+      // first layer used by this candidate: try all measurements, and freeze this one as reference
+      for (const ISL& isl : curLayerList) {
         cand.sourceLinks.push_back(isl);
-        self(self, layerId + 1, station, maxDeltaStrawId, minMeasPerCand, cands, cand, &cand.sourceLinks.back());
-        cand.sourceLinks.pop_back(); // go back
+        self(self, layerId + 1, station, maxLoDeltaStrawId, maxHiDeltaStrawId, minMeasPerCand, cands, cand, &isl);
+        cand.sourceLinks.pop_back();
       }
     } else {
-      // iterate measurements in vicinity: [centerStrawId - maxDeltaStrawId, centerStrawId + maxDeltaStrawId]
-      auto centerStrawId = prevIsl->geometryId().sensitive();
-      auto it = curLayerList.begin();
-      while (it != curLayerList.end() && it->geometryId().sensitive() < centerStrawId - maxDeltaStrawId) {
-        ++it;
+      const int centerStrawId = firstIsl->geometryId().sensitive();
+      const int firstLay = vActsLayerToFtdLayer->at(firstIsl->geometryId().layer());
+      const auto firstLayType = layerTypes[firstLay];
+      const auto layType = layerTypes[layerId];
+      const int maxDelta = (firstLayType == layType) ? maxLoDeltaStrawId : maxHiDeltaStrawId;
+      const int nStraws = nTubesPerLayer[layerId];
+      auto cyclicDelta = [nStraws](int a, int b) {
+        const int d = std::abs(a - b);
+        return std::min(d, nStraws - d);
+      };
+      for (const ISL& isl : curLayerList) {
+        const int strawId = isl.geometryId().sensitive();
+        if (cyclicDelta(strawId, centerStrawId) > maxDelta)
+          continue;
+        cand.sourceLinks.push_back(isl);
+        self(self, layerId + 1, station, maxLoDeltaStrawId, maxHiDeltaStrawId, minMeasPerCand, cands, cand, firstIsl);
+        cand.sourceLinks.pop_back();
       }
-      for (; it != curLayerList.end(); ++it) {
-        auto strawId = it->geometryId().sensitive();
-        if (strawId > centerStrawId + maxDeltaStrawId)
-          break;
-        cand.sourceLinks.push_back(*it);
-        self(self, layerId + 1, station, maxDeltaStrawId, minMeasPerCand, cands, cand, &cand.sourceLinks.back());
-        cand.sourceLinks.pop_back(); // go back
-      }
-      self(self, layerId + 1, station, maxDeltaStrawId, minMeasPerCand, cands, cand, prevIsl);
+      self(self, layerId + 1, station, maxLoDeltaStrawId, maxHiDeltaStrawId, minMeasPerCand, cands, cand, firstIsl);
     }
   };
 
@@ -183,11 +188,11 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     auto& candList = candidates[station];
     Candidate cand;  // starts empty
     cand.station = station;
-    int maxDeltaStrawId;
-    if (station == 0) maxDeltaStrawId = m_cfg.maxDeltaStrawId1;
-    if (station == 2) maxDeltaStrawId = m_cfg.maxDeltaStrawId2;
-    if (station == 4) maxDeltaStrawId = m_cfg.maxDeltaStrawId3;
-    constructCands(constructCands, iL, station, maxDeltaStrawId, m_cfg.minMeasPerCand, candList, cand, nullptr);
+    int maxLoDeltaStrawId, maxHiDeltaStrawId;
+    if (station == 0) { maxLoDeltaStrawId = m_cfg.maxLoDeltaStrawId1; maxHiDeltaStrawId = m_cfg.maxHiDeltaStrawId1; }
+    if (station == 2) { maxLoDeltaStrawId = m_cfg.maxLoDeltaStrawId2; maxHiDeltaStrawId = m_cfg.maxHiDeltaStrawId2; }
+    if (station == 4) { maxLoDeltaStrawId = m_cfg.maxLoDeltaStrawId3; maxHiDeltaStrawId = m_cfg.maxHiDeltaStrawId3; }
+    constructCands(constructCands, iL, station, maxLoDeltaStrawId, maxHiDeltaStrawId, m_cfg.minMeasPerCand, candList, cand, nullptr);
   }
 
   // construct everything else

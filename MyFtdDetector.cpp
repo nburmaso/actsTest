@@ -514,4 +514,10 @@ void MyFtdDetector::CreateTrackingGeometry(bool addFtd, bool addROC, bool addFla
 
   CollectTpcSecRowGeoId(fTrackingGeometry);
   CollectFtdLayerGeoId(fTrackingGeometry);
+  if (addFtd) {
+    fActsLayerToFtdLayer = std::make_shared<std::vector<int>>(FtdLayerToGeoId(fFtdGeo->GetNumberOfLayers()-1).layer() + 1);
+    for (int l = 0; l < fFtdGeo->GetNumberOfLayers(); ++l) {
+      fActsLayerToFtdLayer->at(FtdLayerToGeoId(l).layer()) = l;
+    }
+  }
 }

@@ -129,6 +129,8 @@ public:
     return chLayer;
   }
 
+  std::shared_ptr<std::vector<int>> GetActsLayerToFtdLayer() { return fActsLayerToFtdLayer; }
+
 private:
   // geometry context
   Acts::GeometryContext fGeoCtx;
@@ -151,6 +153,7 @@ private:
   std::map<int, Acts::GeometryIdentifier> fFtdLayerToGeoId{};
   std::unordered_map<Acts::GeometryIdentifier, int> fGeoIdToFtdLayer{};
   std::unordered_map<Acts::GeometryIdentifier, std::pair<int, int>> fGeoIdToTpcSecRow{};
+  std::shared_ptr<std::vector<int>> fActsLayerToFtdLayer{nullptr};
 
   std::shared_ptr<MyFtdGeo> fFtdGeo{nullptr};
   std::shared_ptr<BaseTpcSectorGeo> fSecGeo{nullptr};
