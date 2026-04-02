@@ -346,11 +346,9 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     int i = 0;
     for (auto& candidate : candidates[iStation]){
       for (auto& isl : candidate.sourceLinks){
-        int measId = isl.index();
-        const auto geoId = isl.geometryId();
-        const auto layerId = geoId.layer();
-        const auto strawId = geoId.sensitive();
-        candidatesPerStraw[layerId*10000+strawId].insert(i);
+        int straw = isl.geometryId().layer()*10000+isl.geometryId().sensitive();
+        candidate.straws.push_back(straw);
+        candidatesPerStraw[straw].insert(i);
       }
       selectedCandidates.push_back(candidate);
       selectedCandidateIds.insert(i);
@@ -360,12 +358,13 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     ACTS_VERBOSE("Info on shared measurements...");
     for (int i=0;i<selectedCandidates.size();i++){
       auto& candidate = selectedCandidates[i];
-      for (auto& isl : candidate.sourceLinks){
-        int measId = isl.index();
-        const auto geoId = isl.geometryId();
-        const auto layerId = geoId.layer();
-        const auto strawId = geoId.sensitive();
-        if (candidatesPerStraw[layerId*10000+strawId].size() > 1) {
+      
+      // printf("station %d: candidate %03d: chi2/ndf=%e particles: ", candidate.station, i, candidate.chi2ndf);
+      // for (auto straw : candidate.straws) printf("%06d ", straw);
+      // printf("\n");
+
+      for (auto straw : candidate.straws){
+        if (candidatesPerStraw[straw].size() > 1) {
           candidate.sharedStraws++;
         }
       }
@@ -386,35 +385,31 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       return nMeasA > nMeasB;
     };
 
-    int maximumSharedHits = 1;
-    for (int i = 0; i < 10000; i++) {
+    for (int i = 0; i < m_cfg.maximumIterations; i++) {
       if (selectedCandidateIds.empty()) break;
       auto maximumSharedStraws = *std::max_element(selectedCandidateIds.begin(), selectedCandidateIds.end(), sharedStrawsComperator);
-      // printf("candidate %d with maximumSharedMeasurements=%d\n",maximumSharedMeasurements, selectedCandidates[maximumSharedStraws].sharedStraws);
-      if (selectedCandidates[maximumSharedStraws].sharedStraws <= maximumSharedHits) break;
+      // printf("candidate %d with maximumSharedStraws=%d\n",maximumSharedStraws, selectedCandidates[maximumSharedStraws].sharedStraws);
+      if (selectedCandidates[maximumSharedStraws].sharedStraws <= m_cfg.maximumSharedStraws) break;
       auto badCandidate = *std::max_element(selectedCandidateIds.begin(), selectedCandidateIds.end(), candidateComperator);
       // printf("badCandidate=%d %zu\n",badCandidate, selectedCandidates[badCandidate].sourceLinks.size());
       // remove bad track
-      for (auto& isl : selectedCandidates[badCandidate].sourceLinks) {
-        int im = isl.index();
-        candidatesPerStraw[im].erase(badCandidate);
-        if (candidatesPerStraw[im].size()>1) continue;
+      for (auto straw : selectedCandidates[badCandidate].straws) {
+        candidatesPerStraw[straw].erase(badCandidate);
+        if (candidatesPerStraw[straw].size()>1) continue;
         // only one candidate left
-        auto it = *candidatesPerStraw[im].begin();
+        auto it = *candidatesPerStraw[straw].begin();
         selectedCandidates[it].sharedStraws--;
       }
       selectedCandidateIds.erase(badCandidate);
     }
+    
     ACTS_VERBOSE("Selected candidates...");
     for (auto& id : selectedCandidateIds) {
       auto& sp = selectedCandidates[id];
       if (sp.station==1 || sp.station==3) continue;
       int nlinks = sp.sourceLinks.size();
-      printf("station %d particles: ", sp.station);
-      for (auto& isl : sp.sourceLinks){
-        int im = isl.index();
-        printf("%d ", particleIds[im]);
-      }
+      printf("station %d: chi2/ndf=%e particles: ", sp.station, sp.chi2ndf);
+      for (auto& isl : sp.sourceLinks) printf("%d ", particleIds[isl.index()]);
       printf("\n");
       Acts::SourceLink slink1{sp.sourceLinks[0]};
       Acts::SourceLink slink2{sp.sourceLinks[nlinks-1]};

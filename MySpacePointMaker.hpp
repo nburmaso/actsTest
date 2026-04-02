@@ -35,10 +35,13 @@ class MySpacePointMaker final : public IAlgorithm {
     int maxDeltaStrawId3{12};
     int minMeasPerCand{3};
     double maxChi2{10.};
+    int maximumIterations{10000};
+    int maximumSharedStraws{1};
   };
 
   struct Candidate {
     std::vector<ActsExamples::IndexSourceLink> sourceLinks;
+    std::vector<int> straws;    
     int station = -1;
     double chi2 = -1;
     double chi2ndf = -1;
@@ -52,6 +55,7 @@ class MySpacePointMaker final : public IAlgorithm {
     double x = 0;
     double y = 0;
     double z = 0;
+    bool isGood = 1;
   };
 
   MySpacePointMaker(Config cfg, Acts::Logging::Level lvl);

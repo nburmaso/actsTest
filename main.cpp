@@ -17,6 +17,7 @@
 #include "ActsExamples/TrackFinding/TrackParamsEstimationAlgorithm.hpp"
 #include "ActsExamples/TrackFinding/TrackFindingAlgorithm.hpp"
 #include "ActsExamples/Io/HepMC3/HepMC3InputConverter.hpp"
+#include "ActsExamples/Io/Root/RootTrackParameterWriter.hpp"
 #include "ActsExamples/Io/Root/RootParticleReader.hpp"
 #include "ActsExamples/Io/Root/RootParticleWriter.hpp"
 #include "ActsExamples/Io/Root/RootSimHitReader.hpp"
@@ -113,6 +114,7 @@ int main(int argc, char *argv[]){
   auto spacepoints = "spacepoints";
   auto seeds = "seeds";
   auto estimatedparameters = "estimatedparameters";
+  auto prototracks = "prototracks";
   auto track_particle_matching = "track_particle_matching";
   auto particle_track_matching = "particle_track_matching";
   auto measurement_particles_map = "measurement_particles_map";
@@ -129,6 +131,7 @@ int main(int argc, char *argv[]){
   genCfg.pdg = pdgCode;
   // genCfg.thetaMin = 2 * atan(exp(-etaMax));
   // genCfg.thetaMax = 2 * atan(exp(-etaMin));
+  // genCfg.pMin = 0.2;
   genCfg.pMin = 0.2;
   genCfg.pMax = 1.0;
   // genCfg.pMin = 0.5;
@@ -137,12 +140,12 @@ int main(int argc, char *argv[]){
   // genCfg.phiMax = M_PI/180.*45.00001;
 
   // central UrQMD-like occupancy
-  genCfg.thetaMin = 2 * atan(exp(-1.91));
-  genCfg.thetaMax = 2 * atan(exp(-1.90));
-  // genCfg.thetaMin = 2 * atan(exp(-1.61));
-  // genCfg.thetaMax = 2 * atan(exp(-1.60));
-  // genCfg.thetaMin = 2 * atan(exp(-1.95));
-  // genCfg.thetaMax = 2 * atan(exp(-1.55));
+  // genCfg.thetaMin = 2 * atan(exp(-1.9001));
+  // genCfg.thetaMax = 2 * atan(exp(-1.90));
+  // genCfg.thetaMin = 2 * atan(exp(-1.91));
+  // genCfg.thetaMax = 2 * atan(exp(-1.90));
+  genCfg.thetaMin = 2 * atan(exp(-1.95));
+  genCfg.thetaMax = 2 * atan(exp(-1.55));
   // genCfg.thetaMin = 2 * atan(exp(-1.76));
   // genCfg.thetaMax = 2 * atan(exp(-1.74));
   // genCfg.thetaMin = 2 * atan(exp(-1.93));
@@ -153,9 +156,9 @@ int main(int argc, char *argv[]){
   // genCfg.thetaMax = 0.350001;
   // genCfg.pMin = 1.2;
   // genCfg.pMax = 1.21;
-//  genCfg.randomizeCharge = true;
-genCfg.numParticles = 1;
-//  genCfg.numParticles = 10;
+  genCfg.randomizeCharge = true;
+//  genCfg.numParticles = 1;
+  genCfg.numParticles = 10;
 //  genCfg.numParticles = 1;
   ActsExamples::EventGenerator::Generator gen{
       std::make_shared<ActsExamples::FixedMultiplicityGenerator>(1),
@@ -258,10 +261,12 @@ genCfg.numParticles = 1;
   spCfg.inputMeasurementParticlesMap = measurement_particles_map;
   spCfg.detector = detector;
   spCfg.maxDeltaStrawId1 = 6;
-  spCfg.maxDeltaStrawId2 = 6;
-  spCfg.maxDeltaStrawId3 = 12;
-  spCfg.minMeasPerCand = 4;
+  spCfg.maxDeltaStrawId2 = 8;
+  spCfg.maxDeltaStrawId3 = 10;
+  spCfg.minMeasPerCand = 3;
   spCfg.maxChi2 = 10;
+  spCfg.maximumIterations = 100000;
+  spCfg.maximumSharedStraws = 1;
   spCfg.outputSpacePoints = spacepoints;
   spCfg.geometrySelection = {Acts::GeometryIdentifier{}};
 
@@ -271,7 +276,7 @@ genCfg.numParticles = 1;
   // truthSeedingCfg.inputMeasurementParticlesMap = digiCfg.outputMeasurementParticlesMap;
   // truthSeedingCfg.outputSeeds = seeds;
   // truthSeedingCfg.outputParticles = "seeded_particles";
-  // truthSeedingCfg.outputProtoTracks = "prototracks";
+  // truthSeedingCfg.outputProtoTracks = prototracks;
   // truthSeedingCfg.deltaRMin = 1._mm;
   // truthSeedingCfg.deltaRMax = 100._mm;
 
@@ -293,7 +298,7 @@ genCfg.numParticles = 1;
   seedingCfg.seedFinderConfig.useDetailedDoubleMeasurementInfo = true;
   seedingCfg.seedFinderConfig.minPt              = 0.11_GeV;
   seedingCfg.seedFinderConfig.deltaZMax          = (positions[iM] - positions[iB])*cm + 10_mm;
-  seedingCfg.seedFinderConfig.deltaRMax          = (1-positions[iM]/positions[iF])*rMaxStation*cm + 100_mm;
+  seedingCfg.seedFinderConfig.deltaRMax          = (1-positions[iM]/positions[iF])*rMaxStation*cm + 1_mm;
   seedingCfg.seedFinderConfig.zMin               = positions[iB]*cm - 1_mm;
   seedingCfg.seedFinderConfig.zMax               = positions[iF]*cm + 1_mm;
   seedingCfg.seedFinderConfig.rMin               = ftdGeo->GetLayerRMin(iB)*cm;
@@ -322,17 +327,18 @@ genCfg.numParticles = 1;
   ActsExamples::TrackParamsEstimationAlgorithm::Config paramsEstimationCfg;
   paramsEstimationCfg.inputSeeds = seeds;
   paramsEstimationCfg.outputTrackParameters = estimatedparameters;
+  paramsEstimationCfg.outputProtoTracks = prototracks;
   paramsEstimationCfg.trackingGeometry = trackingGeometry;
   paramsEstimationCfg.magneticField = fatrasCfg.magneticField;
-  // paramsEstimationCfg.initialSigmas = {
-  //       0.01 * Acts::UnitConstants::mm,
-  //       0.01 * Acts::UnitConstants::mm,
-  //       0.01 * Acts::UnitConstants::degree,
-  //       0.01 * Acts::UnitConstants::degree,
-  //       0.01 * Acts::UnitConstants::e / Acts::UnitConstants::GeV,
-  //       1 * Acts::UnitConstants::ns};
-  // paramsEstimationCfg.initialSigmaQoverPt = 0; // 0.1 * Acts::UnitConstants::e / Acts::UnitConstants::GeV;
-  // paramsEstimationCfg.initialSigmaPtRel = 0; //0.1;
+  paramsEstimationCfg.initialSigmas = {
+        0.1 * Acts::UnitConstants::mm,
+        15 * Acts::UnitConstants::mm,
+        3. * Acts::UnitConstants::degree,
+        0.2 * Acts::UnitConstants::degree,                         // theta
+        0.15 * Acts::UnitConstants::e / Acts::UnitConstants::GeV,  // q/p
+        100 * Acts::UnitConstants::ns};
+  paramsEstimationCfg.initialSigmaQoverPt = 0; // 0.1 * Acts::UnitConstants::e / Acts::UnitConstants::GeV;
+  paramsEstimationCfg.initialSigmaPtRel = 0; //0.1;
 
   // Measurement selector
   std::vector<std::pair<Acts::GeometryIdentifier, Acts::MeasurementSelectorCuts>> measSel;
@@ -347,7 +353,7 @@ genCfg.numParticles = 1;
   ActsExamples::TrackFindingAlgorithm::Config trackFindingCfg;
   //trackFindingCfg.reverseSearch = true;
   trackFindingCfg.inputMeasurements = measurements;
-  trackFindingCfg.inputInitialTrackParameters = paramsEstimationCfg.outputTrackParameters;
+  trackFindingCfg.inputInitialTrackParameters = estimatedparameters;
   //trackFindingCfg.outputTracks = tracks;
   trackFindingCfg.outputTracks = ckf_tracks;
   trackFindingCfg.trackingGeometry = trackingGeometry;
@@ -359,7 +365,7 @@ genCfg.numParticles = 1;
   // My::MyTrackFindingAlgorithm::Config myTrackFindingCfg;
   // myTrackFindingCfg.inputMeasurementParticlesMap = measurement_particles_map;
   // myTrackFindingCfg.inputMeasurements = measurements;
-  // myTrackFindingCfg.inputInitialTrackParameters = paramsEstimationCfg.outputTrackParameters;
+  // myTrackFindingCfg.inputInitialTrackParameters = estimatedparameters;
   // myTrackFindingCfg.outputTracks = ckf_tracks;
   // myTrackFindingCfg.trackingGeometry = trackingGeometry;
   // myTrackFindingCfg.magneticField = fatrasCfg.magneticField;
@@ -413,6 +419,15 @@ genCfg.numParticles = 1;
   seedWriterCfg.inputSeeds = seeds;
   seedWriterCfg.writingMode = "";
   seedWriterCfg.filePath = TString(outputDir+"seeds.root").Data();
+
+  ActsExamples::RootTrackParameterWriter::Config paramWriterCfg;
+  paramWriterCfg.inputTrackParameters = estimatedparameters;
+  paramWriterCfg.inputProtoTracks = prototracks;
+  paramWriterCfg.inputParticles = particles;
+  paramWriterCfg.inputSimHits = simhits;
+  paramWriterCfg.inputMeasurementParticlesMap = measurement_particles_map;
+  paramWriterCfg.inputMeasurementSimHitsMap = measurement_simhits_map;
+  paramWriterCfg.filePath = TString(outputDir+"prototracks.root").Data();
 
   // write track states from CKF
   ActsExamples::RootTrackStatesWriter::Config trackStatesWriterCfg;
@@ -483,8 +498,8 @@ genCfg.numParticles = 1;
   sequencer.addWriter(std::make_shared<ActsExamples::RootSimHitWriter>(simhitWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootMeasurementWriter>(measWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootSpacepointWriter>(spWriterCfg, logLevel));
-
   sequencer.addWriter(std::make_shared<ActsExamples::RootSeedWriter>(seedWriterCfg, logLevel));
+  sequencer.addWriter(std::make_shared<ActsExamples::RootTrackParameterWriter>(paramWriterCfg, logLevelV));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackStatesWriter>(trackStatesWriterCfg, logLevel));
   sequencer.addWriter(std::make_shared<ActsExamples::RootTrackSummaryWriter>(trackSummaryWriterCfg, logLevel));
   // sequencer.addWriter(std::make_shared<MyTrackWriter>(trackWriterCfg, logLevel));

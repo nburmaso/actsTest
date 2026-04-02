@@ -21,11 +21,11 @@ bool isGoodFtd(int64_t layerMask, int minHits = 5){
     }
   }
   // printf("%d %d %d %d %d\n",nHits[0],nHits[1],nHits[2],nHits[3],nHits[4]);
-  if (nHits[0]<4) return 0;
-  if (nHits[1]<4) return 0;
-  if (nHits[2]<4) return 0;
-  if (nHits[3]<4) return 0;
-  if (nHits[4]<4) return 0;
+  if (nHits[0]<3) return 0;
+  if (nHits[1]<3) return 0;
+  if (nHits[2]<3) return 0;
+  if (nHits[3]<3) return 0;
+  if (nHits[4]<3) return 0;
   return 1;
 }
 
@@ -54,9 +54,9 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5){
       nSeeds[st] += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
     }
   }
-  if (nSeeds[0]<4) return 0;
-  if (nSeeds[2]<4) return 0;
-  if (nSeeds[4]<4) return 0;
+  if (nSeeds[0]<3) return 0;
+  if (nSeeds[2]<3) return 0;
+  if (nSeeds[4]<3) return 0;
   return 1;
 }
 
@@ -76,8 +76,9 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5){
 //   // if (nSeeds[4]<1) return 0;
 //   return 1;
 // }
-
-void analyse_performance(TString dir = "../build/test/", double etaMean = 1.9, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
+void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
+//void analyse_performance(TString dir = "../build/test/", double etaMean = 1.9, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
+//void analyse_performance(TString dir = "../build/test/", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../acts/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../pi90/acts/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../acts_pi_16/", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
