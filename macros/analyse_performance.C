@@ -10,6 +10,8 @@
 
 const int nStations = 5;
 const int nLayersPerStation = 9;
+// const int shift = 3; //  isroc = 1;  isframe = 1; with fake pre-layer
+const int shift = 2; //  isroc = 1;  isframe = 1; without fake pre-layer
 
 
 bool isGoodFtd(int64_t layerMask, int minHits = 5){
@@ -76,7 +78,8 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5){
 //   // if (nSeeds[4]<1) return 0;
 //   return 1;
 // }
-void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
+void analyse_performance(TString dir = "../build/test/", double etaMean = 1.6, double etaDif = 0.05, bool refit = 0, bool trackable = 1){
+//void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../build/test/", double etaMean = 1.9, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../build/test/", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../acts/", double etaMean = 1.7, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
@@ -84,8 +87,6 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
 //void analyse_performance(TString dir = "../acts_pi_16/", double etaMean = 1.6, double etaDif = 0.1, bool refit = 0, bool trackable = 1){
 // gStyle->SetOptStat(0);
 
-  // int shift = 3; //  isroc = 1;  isframe = 1; with fake pre-layer
-  int shift = 2; //  isroc = 1;  isframe = 1; without fake pre-layer
   // setup particles
   TFile* fPart = new TFile(TString(dir + "particles.root"));
   TTree* tPart = (TTree*) fPart->Get("particles");
