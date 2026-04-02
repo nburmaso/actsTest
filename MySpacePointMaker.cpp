@@ -34,6 +34,135 @@
 #include "Math/Functor.h"
 #include "Math/RootFinder.h"
 
+namespace straw_helpers
+{
+  using ISL = ActsExamples::IndexSourceLink;
+  using FtdLayerTypes = MyFtdGeo::FtdLayerTypes;
+  using PreCandidate = ActsExamples::MySpacePointMaker::PreCandidate;
+
+  struct FirstTypeRefs {
+    int keyA = -1;
+    int keyB = -1;
+    ISL const* refA = nullptr;
+    ISL const* refB = nullptr;
+  };
+
+  struct CandBuildCtx {
+    std::vector<std::list<ISL>> const& mesPerLay;
+    std::vector<int> const& layerTypes;
+    std::vector<int> const& nTubesPerLayer;
+    std::shared_ptr<MyFtdGeo> ftdGeo;
+    int nLayers = 0;
+    int nLayPerSt = 0;
+
+    int maxLoDeltaPStrawId = 0;
+    int maxLoDeltaMStrawId = 0;
+    int maxHiDeltaPStrawId = 0;
+    int maxHiDeltaMStrawId = 0;
+    int minMeasPerCand = 0;
+  };
+
+
+  static inline ISL const* findRefForType(FirstTypeRefs const& refs, int typeKey) {
+    if (refs.keyA == typeKey) return refs.refA;
+    if (refs.keyB == typeKey) return refs.refB;
+    return nullptr;
+  }
+
+  static inline ISL const* findOtherRef(FirstTypeRefs const& refs, int typeKey) {
+    if (refs.keyA != -1 && refs.keyA != typeKey) return refs.refA;
+    if (refs.keyB != -1 && refs.keyB != typeKey) return refs.refB;
+    return nullptr;
+  }
+
+  static inline void setFirstRefForType(FirstTypeRefs& refs, int typeKey, ISL const* isl) {
+    if (refs.keyA == typeKey) {
+      if (refs.refA == nullptr) refs.refA = isl;
+      return;
+    }
+    if (refs.keyB == typeKey) {
+      if (refs.refB == nullptr) refs.refB = isl;
+      return;
+    }
+    if (refs.keyA == -1) {
+      refs.keyA = typeKey;
+      refs.refA = isl;
+      return;
+    }
+    if (refs.keyB == -1) {
+      refs.keyB = typeKey;
+      refs.refB = isl;
+    }
+  }
+
+  static inline int cyclicDelta(int cur, int ref, int nStraws) {
+    int d = cur - ref;
+    if (d >  nStraws / 2) d -= nStraws;
+    if (d < -nStraws / 2) d += nStraws;
+    return d;
+  }
+
+  static inline bool passesAgainstRefStraw(int strawId, int refStrawId,
+                                           int maxDeltaP, int maxDeltaM,
+                                           int nStraws) {
+    const int delta = cyclicDelta(strawId, refStrawId, nStraws);
+    if (delta >= 0 && delta > maxDeltaP) return false;
+    if (delta <  0 && -delta > maxDeltaM) return false;
+    return true;
+  }
+
+  void constructCands(int layerId,
+                      int station,
+                      CandBuildCtx const& ctx,
+                      std::list<PreCandidate>& cands,
+                      PreCandidate& cand,
+                      FirstTypeRefs& refs)
+  {
+    const int layerInStation = layerId % ctx.nLayPerSt;
+    const int layersLeft = ctx.nLayPerSt - layerInStation;
+    const int missing = ctx.minMeasPerCand - static_cast<int>(cand.sourceLinks.size());
+
+    if (missing > 0 && layersLeft < missing)
+      return;
+
+    if (layerId >= ctx.nLayers || ctx.ftdGeo->GetLayerStation(layerId) != station) {
+      if (static_cast<int>(cand.sourceLinks.size()) >= ctx.minMeasPerCand) {
+        cands.emplace_back(cand);
+      }
+      return;
+    }
+
+    if (ctx.ftdGeo->GetLayerType(layerId) == FtdLayerTypes::kPixel) {
+      constructCands(layerId + 1, station, ctx, cands, cand, refs);
+      return;
+    }
+
+    auto const& curLayerList = ctx.mesPerLay[layerId];
+    const int layTypeKey = static_cast<int>(ctx.layerTypes[layerId]);
+    const int nStraws = ctx.nTubesPerLayer[layerId];
+
+    ISL const* sameTypeRef = findRefForType(refs, layTypeKey);
+    ISL const* otherTypeRef = findOtherRef(refs, layTypeKey);
+
+    const int sameRefStrawId = (sameTypeRef != nullptr) ? sameTypeRef->geometryId().sensitive() : -1;
+    const int otherRefStrawId = (otherTypeRef != nullptr) ? otherTypeRef->geometryId().sensitive() : -1;
+
+    for (const ISL& isl : curLayerList) {
+      const int strawId = isl.geometryId().sensitive();
+      bool ok = true;
+      if (sameTypeRef != nullptr) ok = passesAgainstRefStraw(strawId, sameRefStrawId, ctx.maxLoDeltaPStrawId, ctx.maxLoDeltaMStrawId, nStraws);
+      if (ok && otherTypeRef != nullptr) ok = passesAgainstRefStraw(strawId, otherRefStrawId, ctx.maxHiDeltaPStrawId, ctx.maxHiDeltaMStrawId, nStraws);
+      if (!ok) continue;
+      if (sameTypeRef == nullptr) setFirstRefForType(refs, layTypeKey, &isl);
+      cand.sourceLinks.push_back(isl);
+      constructCands(layerId + 1, station, ctx, cands, cand, refs);
+      cand.sourceLinks.pop_back();
+    }
+
+    constructCands(layerId + 1, station, ctx, cands, cand, refs);
+  }
+}
+
 ActsExamples::MySpacePointMaker::MySpacePointMaker(Config cfg, Acts::Logging::Level lvl)
   : IAlgorithm("MySpacePointMaker", lvl), m_cfg(std::move(cfg)) {
   m_inputMeasurements.initialize(m_cfg.inputMeasurements);
@@ -55,8 +184,6 @@ ActsExamples::MySpacePointMaker::MySpacePointMaker(Config cfg, Acts::Logging::Le
   m_spacePointBuilder = Acts::SpacePointBuilder<SimSpacePoint>(spBuilderConfig, spConstructor, Acts::getDefaultLogger("SpacePointBuilder", lvl));
 }
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "misc-no-recursion"
 ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const AlgorithmContext& ctx) const {
   ACTS_INFO("Starting my space point maker for event " << ctx.eventNumber);
   using ISL = IndexSourceLink;
@@ -119,80 +246,6 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   const std::vector<int>& layerTypes = ftdGeo->GetLayerTypes();
   auto vActsLayerToFtdLayer = det->GetActsLayerToFtdLayer();
 
-  // iterate through layer measurements recursively
-  auto constructCands = [&](auto&& self,
-                            int layerId,
-                            int station,
-                            int maxLoDeltaPStrawId, int maxLoDeltaMStrawId,
-                            int maxHiDeltaPStrawId, int maxHiDeltaMStrawId,
-                            int minMeasPerCand,
-                            std::list<PreCandidate>& cands,
-                            PreCandidate& cand,
-                            ISL const* firstIsl) -> void
-  {
-    // not enough measurements found and not enough layers left to check
-    if ((cand.sourceLinks.size() < minMeasPerCand) &&
-        (nLayPerSt - (layerId % nLayPerSt) < (minMeasPerCand - static_cast<int>(cand.sourceLinks.size())))) {
-      return;
-    }
-    // reached end of layers or another station -> store completed candidate
-    if (ftdGeo->GetLayerStation(layerId) != station || layerId >= nLayers) {
-      if (cand.sourceLinks.size() >= minMeasPerCand)
-        cands.emplace_back(cand);
-      return;
-    }
-    // skip fake pixel layers
-    if (ftdGeo->GetLayerType(layerId) == FtdLayerTypes::kPixel) {
-      self(self, layerId + 1, station, maxLoDeltaPStrawId, maxLoDeltaMStrawId,
-           maxHiDeltaPStrawId, maxHiDeltaMStrawId, minMeasPerCand, cands, cand, firstIsl);
-      return;
-    }
-    auto& curLayerList = mesPerLay[layerId];
-    if (firstIsl == nullptr) {
-      // first layer used by this candidate: try all measurements, and freeze this one as reference
-      for (const ISL& isl : curLayerList) {
-        cand.sourceLinks.push_back(isl);
-        self(self, layerId + 1, station, maxLoDeltaPStrawId, maxLoDeltaMStrawId,
-             maxHiDeltaPStrawId, maxHiDeltaMStrawId, minMeasPerCand, cands, cand, &isl);
-        cand.sourceLinks.pop_back();
-      }
-    } else {
-      const int centerStrawId = firstIsl->geometryId().sensitive();
-      const int firstLay = vActsLayerToFtdLayer->at(firstIsl->geometryId().layer());
-      const auto firstLayType = layerTypes[firstLay];
-      const auto layType = layerTypes[layerId];
-      int maxDeltaP, maxDeltaM;
-      if (firstLayType == layType) {
-        maxDeltaP = maxLoDeltaPStrawId;
-        maxDeltaM = maxLoDeltaMStrawId;
-      } else {
-        maxDeltaP = maxHiDeltaPStrawId;
-        maxDeltaM = maxHiDeltaMStrawId;
-      }
-      const int nStraws = nTubesPerLayer[layerId];
-      auto cyclicDelta = [nStraws](int prev, int cur) {
-        int d = cur - prev;
-        if (d >  nStraws / 2) d -= nStraws;
-        if (d < -nStraws / 2) d += nStraws;
-        return d;
-      };
-      for (const ISL& isl : curLayerList) {
-        const int strawId = isl.geometryId().sensitive();
-        int delta = cyclicDelta(strawId, centerStrawId);
-        if (delta >= 0 && delta > maxDeltaP)
-          continue;
-        if (delta < 0 && -delta > maxDeltaM)
-          continue;
-        cand.sourceLinks.push_back(isl);
-        self(self, layerId + 1, station, maxLoDeltaPStrawId, maxLoDeltaMStrawId,
-             maxHiDeltaPStrawId, maxHiDeltaMStrawId, minMeasPerCand, cands, cand, firstIsl);
-        cand.sourceLinks.pop_back();
-      }
-      self(self, layerId + 1, station,  maxLoDeltaPStrawId, maxLoDeltaMStrawId,
-           maxHiDeltaPStrawId, maxHiDeltaMStrawId, minMeasPerCand, cands, cand, firstIsl);
-    }
-  };
-
   // construct straw spacepoints
   std::vector<std::list<PreCandidate>> preCandidates(nStations);
   for (int iL = 0; iL < nLayers; ++iL) {
@@ -201,6 +254,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     int station = ftdGeo->GetLayerStation(iL);
     if (station==1 || station==3) continue;
     auto& candList = preCandidates[station];
+    straw_helpers::FirstTypeRefs emptyRefs;
     PreCandidate cand;  // starts empty
     int maxLoDeltaPStrawId, maxHiDeltaPStrawId;
     int maxLoDeltaMStrawId, maxHiDeltaMStrawId;
@@ -210,10 +264,12 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     if (station == 0) { maxLoDeltaMStrawId = m_cfg.maxLoDeltaMStrawId1; maxHiDeltaMStrawId = m_cfg.maxHiDeltaMStrawId1; }
     if (station == 2) { maxLoDeltaMStrawId = m_cfg.maxLoDeltaMStrawId2; maxHiDeltaMStrawId = m_cfg.maxHiDeltaMStrawId2; }
     if (station == 4) { maxLoDeltaMStrawId = m_cfg.maxLoDeltaMStrawId3; maxHiDeltaMStrawId = m_cfg.maxHiDeltaMStrawId3; }
-    constructCands(constructCands, iL, station,
-                   maxLoDeltaPStrawId, maxLoDeltaMStrawId,
-                   maxHiDeltaPStrawId, maxHiDeltaMStrawId,
-                   m_cfg.minMeasPerCand, candList, cand, nullptr);
+    straw_helpers::CandBuildCtx buildCtx{mesPerLay, layerTypes, nTubesPerLayer,
+                                         ftdGeo, nLayers, nLayPerSt,
+                                         maxLoDeltaPStrawId, maxLoDeltaMStrawId,
+                                         maxHiDeltaPStrawId, maxHiDeltaMStrawId,
+                                         m_cfg.minMeasPerCand};
+    straw_helpers::constructCands(iL, station, buildCtx, candList, cand, emptyRefs);
   }
 
   // construct everything else

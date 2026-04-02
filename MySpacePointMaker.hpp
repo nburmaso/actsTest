@@ -48,12 +48,6 @@ class MySpacePointMaker final : public IAlgorithm {
     int maximumSharedStraws{1};
   };
 
-  MySpacePointMaker(Config cfg, Acts::Logging::Level lvl);
-  ProcessCode execute(const AlgorithmContext& ctx) const override;
-  const Config& config() const { return m_cfg; }
-
- private:
-
   struct PreCandidate {
     std::vector<ActsExamples::IndexSourceLink> sourceLinks;
   };
@@ -75,6 +69,12 @@ class MySpacePointMaker final : public IAlgorithm {
     double y = 0;
     double z = 0;
   };
+
+  MySpacePointMaker(Config cfg, Acts::Logging::Level lvl);
+  ProcessCode execute(const AlgorithmContext& ctx) const override;
+  const Config& config() const { return m_cfg; }
+
+ private:
 
   std::tuple<double,double,double,double,double,double> linear(PreCandidate& cand, const std::vector<std::array<double, 5>>& cacheZSCGD, bool debug = 0) const;
 
