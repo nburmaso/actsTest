@@ -42,10 +42,20 @@ class MySpacePointMaker final : public IAlgorithm {
     int maximumSharedStraws{1};
   };
 
+  MySpacePointMaker(Config cfg, Acts::Logging::Level lvl);
+  ProcessCode execute(const AlgorithmContext& ctx) const override;
+  const Config& config() const { return m_cfg; }
+
+ private:
+
+  struct PreCandidate {
+    std::vector<ActsExamples::IndexSourceLink> sourceLinks;
+  };
+
   struct Candidate {
     std::vector<ActsExamples::IndexSourceLink> sourceLinks;
-    std::vector<int> straws;    
     int station = -1;
+    std::vector<int> straws;
     double chi2 = -1;
     double chi2ndf = -1;
     double tx = 0;
@@ -58,18 +68,12 @@ class MySpacePointMaker final : public IAlgorithm {
     double x = 0;
     double y = 0;
     double z = 0;
-    bool isGood = 1;
   };
 
-  MySpacePointMaker(Config cfg, Acts::Logging::Level lvl);
-  ProcessCode execute(const AlgorithmContext& ctx) const override;
-  const Config& config() const { return m_cfg; }
+  std::tuple<double,double,double,double,double,double> linear(PreCandidate& cand, const std::vector<std::array<double, 5>>& cacheZSCGD, bool debug = 0) const;
 
-  double linear(Candidate& cand, const std::vector<std::array<double, 5>>& cacheZSCGD, bool debug = 0) const;
-  
-  double parabolic(Candidate& cand, const std::vector<std::array<double, 5>>& cacheZSCGD, bool debug = 0) const;
+  std::tuple<double,double,double,double> parabolic(PreCandidate& cand, const std::vector<std::array<double, 5>>& cacheZSCGD, bool debug = 0) const;
 
- private:
   Config m_cfg;
   std::optional<IndexSourceLink::SurfaceAccessor> m_slSurfaceAccessor;
   Acts::SpacePointBuilder<SimSpacePoint> m_spacePointBuilder;
