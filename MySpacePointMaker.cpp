@@ -91,7 +91,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   int nLayPerSt = ftdGeo->GetNLayersPerStation();
   int nLayers = ftdGeo->GetNumberOfLayers();
 
-  std::vector<std::array<double, 4>> cacheZSCGD(measurements.size());
+  std::vector<std::array<double, 5>> cacheZSCGD(measurements.size());
   std::vector<std::list<ISL>> mesPerLay(nLayers);
   for (const auto& isl : measurements.orderedIndices()) {
     const auto geoId = isl.geometryId();
@@ -372,7 +372,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
 }
 
 double ActsExamples::MySpacePointMaker::linear(
-  Candidate& cand, const std::vector<std::array<double, 4>>& cacheZSCGD, bool debug) const
+  Candidate& cand, const std::vector<std::array<double, 5>>& cacheZSCGD, bool debug) const
 {
   int n = cand.sourceLinks.size();
 
@@ -395,12 +395,12 @@ double ActsExamples::MySpacePointMaker::linear(
     gs += w * g * s;
     gc += w * g * c;
   }
-  double dd = cc * ss - sc * sc;
-  cand.tx = (sc * gc - cc * gs) / dd;
-  cand.ty = (ss * gc - sc * gs) / dd;
-  cand.varxx = cc / dd;
-  cand.varyy = ss / dd;
-  cand.varxy = sc / dd;
+  double dd = 1./(cc * ss - sc * sc);
+  cand.tx = (sc * gc - cc * gs) * dd;
+  cand.ty = (ss * gc - sc * gs) * dd;
+  cand.varxx = cc * dd;
+  cand.varyy = ss * dd;
+  cand.varxy = sc * dd;
 
   double chi2 = 0;
   for (int i=0;i<n;i++){
@@ -418,7 +418,7 @@ double ActsExamples::MySpacePointMaker::linear(
 }
 
 double ActsExamples::MySpacePointMaker::parabolic(
-  Candidate& cand, const std::vector<std::array<double, 4>>& cacheZSCGD, bool debug) const
+  Candidate& cand, const std::vector<std::array<double, 5>>& cacheZSCGD, bool debug) const
 {
   int n = cand.sourceLinks.size();
   std::vector<double> sk(n, 0.);
