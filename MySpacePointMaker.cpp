@@ -304,7 +304,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   SimSpacePointContainer spacePoints;
 
   for (int iStation=0;iStation<nStations;iStation++) {
-    ACTS_INFO("Station " << iStation << ": number of filtered candidates " << preCandidates[iStation].size());
+    ACTS_VERBOSE("Station " << iStation << ": number of filtered candidates " << preCandidates[iStation].size());
     std::vector<Candidate> selectedCandidates;
     std::set<int> selectedCandidateIds;
     std::map<int,std::set<int>> candidatesPerStraw;
