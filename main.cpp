@@ -260,9 +260,12 @@ int main(int argc, char *argv[]){
   spCfg.inputMeasurements = measurements;
   spCfg.inputMeasurementParticlesMap = measurement_particles_map;
   spCfg.detector = detector;
-  spCfg.maxDeltaStrawId1 = 6;
-  spCfg.maxDeltaStrawId2 = 8;
-  spCfg.maxDeltaStrawId3 = 10;
+  spCfg.maxLoDeltaPStrawId1 = 1;  spCfg.maxLoDeltaMStrawId1 = 1;  // ST0
+  spCfg.maxHiDeltaPStrawId1 = 4;  spCfg.maxHiDeltaMStrawId1 = 6;  // ST0
+  spCfg.maxLoDeltaPStrawId2 = 1;  spCfg.maxLoDeltaMStrawId2 = 1;  // ST2
+  spCfg.maxHiDeltaPStrawId2 = 6;  spCfg.maxHiDeltaMStrawId2 = 8;  // ST2
+  spCfg.maxLoDeltaPStrawId3 = 1;  spCfg.maxLoDeltaMStrawId3 = 1;  // ST4
+  spCfg.maxHiDeltaPStrawId3 = 8;  spCfg.maxHiDeltaMStrawId3 = 10; // ST4
   spCfg.minMeasPerCand = 3;
   spCfg.maxChi2 = 10;
   spCfg.maximumIterations = 100000;
