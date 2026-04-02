@@ -12,7 +12,12 @@
 #include "TGraph.h"
 #include "TLegend.h"
 
-void analyse_measurements(){
+
+const int nStations = 5;
+const int nLayersPerStation = 9;
+const int shift = 2;
+
+void analyse_measurements(int selected_station = 4){
   gStyle->SetOptStat(0);
   TFile* fMeas = new TFile("../build/test/measurements.root");
   TTree* tMeas = (TTree*) fMeas->Get("measurements");
@@ -28,113 +33,34 @@ void analyse_measurements(){
   tMeas->SetBranchAddress("surface_id",&m_surface_id);
   tMeas->SetBranchAddress("true_loc0",&m_true_loc0);
 
-  TH1D* hLoc0 = new TH1D("hLoc0","",1000,-10,10);
-  TH1D* hSurfaceID0 = new TH1D("hSurfaceID0","",1000,0,1000);
-  TH1D* hSurfaceID4 = new TH1D("hSurfaceID4","",1000,0,1000);
-
-  TH1D* hSurfaceIDLayer1 = new TH1D("hSurfaceID0Layer1","",1000,0,1000);
-  TH1D* hSurfaceIDLayer2 = new TH1D("hSurfaceID0Layer2","",1000,0,1000);
-
-  TH2D* hL1vsL4 = new TH2D("hL1vsL4","",1000,0,1000,1000,0,1000);
-  TH1D* hL4minusL0 = new TH1D("hL4minusL0","",10,-10,10);
-  TH1D* hL5minusL1 = new TH1D("hL5minusL1","",10,-10,10);
-  TH1D* hL6minusL2 = new TH1D("hL6minusL2","",10,-10,10);
-
-  TH1D* hL1minusL0 = new TH1D("hL1minusL0","",10,-10,10);
-  TH1D* hL2minusL1 = new TH1D("hL2minusL1","",10,-10,10);
-  TH1D* hL2minusL0 = new TH1D("hL2minusL0","",10,-10,10);
-  TH1D* hL5minusL0 = new TH1D("hL5minusL0","",10,-10,10);
-  TH1D* hL6minusL0 = new TH1D("hL6minusL0","",10,-10,10);
+  TH1D* hStrawDiff[nLayersPerStation];
+  for (int i=0;i<nLayersPerStation;i++){
+    hStrawDiff[i] = new TH1D(Form("hStrawDiff%d",i),Form("Layer%d - Layer0",i),20,-10,10);
+  }
 
   int prev_event_id = -1;
-  int l0 = -1;
-  int l1 = -1;
-  int l2 = -1;
-  int l4 = -1;
-  int l5 = -1;
-  int l6 = -1;
+  int straw0 = -1;
   for (int im=0; im<tMeas->GetEntries(); im++){
     tMeas->GetEntry(im);
     if (m_event_id!=prev_event_id) {
-      l0=-1;
-      l1=-1;
-      l2=-1;
-      l4=-1;
-      l5=-1;
-      l6=-1;
+      straw0 = -1;
       prev_event_id = m_event_id;
     }
-    if (m_layer_id==2) continue;
-    if (m_layer_id==38) continue;    
-    if ((m_layer_id-3)%7==3) continue;
-    // printf("%f\n",m_true_loc0);
-    hLoc0->Fill(m_true_loc0);
-    if ((m_layer_id-3)/7==0) hSurfaceID0->Fill(m_surface_id);
-    if ((m_layer_id-3)/7==4) hSurfaceID4->Fill(m_surface_id);
-    if ((m_layer_id-3)==0) {
-      hSurfaceIDLayer1->Fill(m_surface_id);
-      l0=m_surface_id;
-    }
-    if ((m_layer_id-3)==1) {
-      l1=m_surface_id;
-      if (l0!=-1) hL1minusL0->Fill(m_surface_id-l0);
-    }
-    if ((m_layer_id-3)==2) {
-      l2=m_surface_id;
-      if (l0!=-1) hL2minusL0->Fill(m_surface_id-l0);
-      if (l1!=-1) hL2minusL1->Fill(m_surface_id-l1);
-    }
-    if ((m_layer_id-3)==4) {
-      l5=m_surface_id;
-    }
-    if ((m_layer_id-3)==5) {
-      l5=m_surface_id;
-      if (l0!=-1) hL5minusL0->Fill(m_surface_id-l0);
-    }
-    if ((m_layer_id-3)==6) {
-      l6=m_surface_id;
-      if (l0!=-1) hL6minusL0->Fill(m_surface_id-l0);
-    }
-
-    if ((m_layer_id-3)==4) {
-      hSurfaceIDLayer2->Fill(m_surface_id);
-      printf("%d\n",l0);
-      if (l0!=-1) hL4minusL0->Fill(m_surface_id-l0);
-    }
-    if ((m_layer_id-3)==5) {
-      if (l1!=-1) hL5minusL1->Fill(m_surface_id-l1);
-    }
-    if ((m_layer_id-3)==6) {
-      if (l2!=-1) hL6minusL2->Fill(m_surface_id-l2);
-    }
+    int station = (m_layer_id-shift)/nLayersPerStation;
+    int layer = (m_layer_id-shift)%nLayersPerStation;
+    int straw = m_surface_id;
+    if (station!=selected_station) continue;
+    if (layer==0) straw0 = straw;
+    if (straw0<0) continue;
+    hStrawDiff[layer]->Fill(straw-straw0);
   }
-  new TCanvas;
-  hLoc0->Draw();
-  new TCanvas;
-  hSurfaceID0->Draw();
-  new TCanvas;
-  hSurfaceID4->Draw();
-  new TCanvas;
-  hSurfaceIDLayer1->Draw();
-  new TCanvas;
-  hSurfaceIDLayer2->Draw();
-  new TCanvas;
-  hL1vsL4->Draw();
-  new TCanvas;
-  hL4minusL0->Draw();
-  new TCanvas;
-  hL5minusL1->Draw();
-  new TCanvas;
-  hL6minusL2->Draw();
-  new TCanvas;
-  hL1minusL0->Draw();
-  new TCanvas;
-  hL2minusL0->Draw();
-  new TCanvas;
-  hL5minusL0->Draw();
-  new TCanvas;
-  hL6minusL0->Draw();
-  new TCanvas;
-  hL2minusL1->Draw();
+
+  TCanvas* cStrawDiff = new TCanvas(Form("straw_diff_station%d",selected_station),Form("straw_diff_station%d",selected_station),1900,1000);
+  cStrawDiff->Divide(3,3,0.001,0.001);
+  for (int i=0;i<nLayersPerStation;i++){
+    cStrawDiff->cd(i+1);
+    hStrawDiff[i]->Draw();
+  }
+  cStrawDiff->Print(".png");
 }
 
