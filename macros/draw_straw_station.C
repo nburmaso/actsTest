@@ -140,10 +140,11 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
   for (int ih=0;ih<tHits->GetEntries();ih++){
     tHits->GetEntry(ih);
     if (selected_event>=0 && event_id!=selected_event) continue;
-    if (fabs(tz/10-lz)>2) continue;
-    if (fabs(tz/10-lz)<0.01) gh->AddPoint(tx/10,ty/10);
-    printf("%f\n",tz);
+    auto geoId = Acts::GeometryIdentifier(geometry_id);
+    int layer = geoId.layer()-shift;      
+    if (fabs(layer-selected_layer)>nLayersPerStation/2) continue;
     g->AddPoint(tx/10,ty/10);
+    if (fabs(tz/10-lz)<0.01) gh->AddPoint(tx/10,ty/10);
   }
 
 //  g->SetMarkerColor(color);
@@ -175,16 +176,13 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
       tSpacepoints->GetEntry(is);
       if (selected_event>=0 && sevent_id!=selected_event) continue;
       auto geoId = Acts::GeometryIdentifier(sgeometry_id);
-      int layerActs = geoId.layer();
-      int surfaceActs = geoId.sensitive();
-      if (fabs(sz/10-lz)>2) continue;
-
-//      if (surfaceActs==1) continue;
+      int layer = geoId.layer()-shift;      
+      if (fabs(layer-selected_layer)>nLayersPerStation/2) continue;
       gSP->AddPoint(sx/10.,sy/10.);
   }
   gSP->SetMarkerColor(kMagenta);
   gSP->SetMarkerStyle(kFullCircle);
-  gSP->SetMarkerSize(1.0);
+  gSP->SetMarkerSize(0.7);
   gSP->Draw("p");
 
 }
