@@ -17,6 +17,8 @@
 #include "../MyFtdGeo.h"
 using namespace std;
 
+const int shift = 2; //  isroc = 1;  isframe = 1; without fake pre-layer
+
 // set layer corresponding to fake surface in the middle of the station
 void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool draw_spacepoints = 1, bool zoom = 0){
   TString dir = "../build/test";
@@ -29,6 +31,7 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
   double dr = (rmax-rmin)/2.;
   double rc = (rmin+rmax)/2.;
   double lz = fg.GetLayerPositions()[selected_layer];
+  const int nLayersPerStation = fg.GetNLayersPerStation();
 
   // new TCanvas("cmeas","cmeas",1320,1320);
   new TCanvas("cmeas","cmeas",850,850);
@@ -50,21 +53,21 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
 
   using std::numbers::pi;
 
-  std::map<int, TPolyLine*> mapPolyLines[7];
-  for (int layerId=selected_layer-3; layerId<=selected_layer+3; layerId++){
-    int layerType = fg.GetLayerType(layerId);
+  std::map<int, TPolyLine*> mapPolyLines[nLayersPerStation];
+  for (int layer=selected_layer-nLayersPerStation/2; layer<=selected_layer+nLayersPerStation/2; layer++){
+    int layerType = fg.GetLayerType(layer);
     if (layerType == 2) continue;
-    bool back = ((layerId-1)%7)/3>0;
+    bool back = layer>selected_layer;
     auto color = back ? kOrange : kOrange+7;
     if (layerType == 5) color = back ? kGreen-7 : kGreen+1;
     if (layerType == 6) color = back ? kAzure+6 : kAzure;
-    int nStraws = fg.GetLayerNumberOfTubes(layerId);
-    double strawHalfLength = dr/cos(fg.GetLayerStereoAngle(layerId));
+    int nStraws = fg.GetLayerNumberOfTubes(layer);
+    double strawHalfLength = dr/cos(fg.GetLayerStereoAngle(layer));
     for (int strawId=0; strawId < nStraws; strawId++){
-      double xc = fg.GetTubeCenterX(layerId, strawId);
-      double yc = fg.GetTubeCenterY(layerId, strawId);
+      double xc = fg.GetTubeCenterX(layer, strawId);
+      double yc = fg.GetTubeCenterY(layer, strawId);
       ROOT::Math::XYPoint pc(xc, yc);
-      ROOT::Math::Polar2DVector vc1(strawHalfLength, fg.GetTubeRotationAngle(layerId, strawId));
+      ROOT::Math::Polar2DVector vc1(strawHalfLength, fg.GetTubeRotationAngle(layer, strawId));
       ROOT::Math::XYPoint prmax = pc + vc1;
       ROOT::Math::XYPoint prmin = pc - vc1;
       double x[] = {prmin.x(), prmax.x()};
@@ -75,7 +78,7 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
       pline->SetLineWidth(1);
       // pline->Draw("f");
       // pline->Draw();
-      mapPolyLines[layerId%7].emplace(strawId, pline);
+      mapPolyLines[layer%nLayersPerStation].emplace(strawId, pline);
     }
   }
 
@@ -98,11 +101,12 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
   for (int im=0; im<tMeas->GetEntries(); im++){
     tMeas->GetEntry(im);
     if (selected_event>=0 && m_event_id!=selected_event) continue;
-    int layerType = fg.GetLayerType(m_layer_id-2);
+    int layer = m_layer_id-shift;
+    int layerType = fg.GetLayerType(layer);
     if (layerType == 2) continue;
     if (fabs(m_true_z/10-lz)>3) continue;
     printf("%d %d\n",m_layer_id,m_surface_id);
-    auto pline = mapPolyLines[(m_layer_id-2)%7][m_surface_id-1];
+    auto pline = mapPolyLines[layer%nLayersPerStation][m_surface_id-1];
     pline->SetLineWidth(2);
     pline->Draw();
   }
