@@ -417,9 +417,32 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       auto& sp = selectedCandidates[id];
       if (sp.station==1 || sp.station==3) continue;
       int nlinks = sp.sourceLinks.size();
+
       // printf("station %d: chi2/ndf=%e particles: ", sp.station, sp.chi2ndf);
       // for (auto& isl : sp.sourceLinks) printf("%d ", particleIds[isl.index()]);
       // printf("\n");
+
+      // find majority particle id and majority ratio
+      auto identifyContributingParticles = [&sp, &particleIds]() {
+        std::vector<std::pair<int, int>> particleCounts;
+        for (auto& isl : sp.sourceLinks) {
+          int particleId = particleIds[isl.index()];
+          auto it = std::ranges::find_if(particleCounts, [=](const auto& a) { return (a.first == particleId); });
+          if (it != particleCounts.end()) {
+            it->second += 1u;
+          } else {
+            particleCounts.push_back({particleId, 1u});
+          }
+        }
+        std::ranges::sort(particleCounts, std::greater{},[](const auto& p) { return p.second; });
+        return particleCounts;
+      };
+      auto particleCounts = identifyContributingParticles();
+      int majorityParticleId = particleCounts.front().first;
+      int nMajority = particleCounts.front().second;
+      double majorityCode = majorityParticleId + 0.1*nMajority/nlinks;
+      ACTS_VERBOSE("majorityParticleId=" << majorityParticleId << " nMajourity=" << nMajority);
+
       Acts::SourceLink slink1{sp.sourceLinks[0]};
       Acts::SourceLink slink2{sp.sourceLinks[nlinks-1]};
       const Acts::Surface* surface = m_slSurfaceAccessor.value()(slink1);
@@ -435,7 +458,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       double var_z = 0.1;
       if (var_r>1e-5) continue;
       //std::back_inserter(spacePoints) = SimSpacePoint(pos, sp.chi2ndf*Acts::UnitConstants::ns, var_r, var_z, 0, slinks);
-      std::back_inserter(spacePoints) = SimSpacePoint(pos, 0, var_r, var_z, 0, slinks);
+      std::back_inserter(spacePoints) = SimSpacePoint(pos, majorityCode*Acts::UnitConstants::ns, var_r, var_z, 0, slinks);
       // std::back_inserter(spacePoints) = SimSpacePoint(pos, sp.varxy*sp.z*sp.z*Acts::UnitConstants::ns, sp.varxx*sp.z*sp.z, sp.varyy*sp.z*sp.z, 0, slinks);
     }
   }
