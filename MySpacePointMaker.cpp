@@ -132,9 +132,8 @@ namespace straw_helpers
       return;
 
     if (layerId >= ctx.nLayers || ctx.ftdGeo->GetLayerStation(layerId) != station) {
-      if (static_cast<int>(cand.sourceLinks.size()) >= ctx.minMeasPerCand) {
+      if (static_cast<int>(cand.sourceLinks.size()) >= ctx.minMeasPerCand && cand.refTypeA != -1 && cand.refTypeB != -1)
         cands.emplace_back(cand);
-      }
       return;
     }
 
@@ -338,18 +337,18 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       auto& preCandidate = *it;
       ACTS_VERBOSE("  candidate.size=" << preCandidate.sourceLinks.size());
       int n = preCandidate.sourceLinks.size();
-      printf("station %d: ", iStation);
-      for (const auto& isl : preCandidate.sourceLinks) {
-        printf("%d ", vActsLayerToFtdLayer->at(isl.geometryId().layer()));
-      }
-      printf("\n");
-      auto [chi2lin, txl, tyl, varxx, varyy, varxy] = linear(preCandidate, cacheZSCGD);
-      ACTS_VERBOSE("lin:  n=" << n << " tx=" << txl <<" ty=" << tyl << " chi2/ndf=" << chi2lin/(n-2));
+//      printf("station %d: ", iStation);
+//      for (const auto& isl : preCandidate.sourceLinks) {
+//        printf("%d ", vActsLayerToFtdLayer->at(isl.geometryId().layer()));
+//      }
+//      printf("\n");
       auto [chi2par, tx, ty, k] = parabolic(preCandidate, cacheZSCGD);
       double chi2ndf = n>3 ? chi2par/(n-3) : chi2par;
       ACTS_VERBOSE("par:  n=" << n << " tx=" << tx <<" ty=" << ty << " chi2/ndf=" << chi2ndf);
       // printf("chi2ndf=%f\n",chi2ndf);
       if (!(chi2ndf > m_cfg.maxChi2)) {
+        auto [chi2lin, txl, tyl, varxx, varyy, varxy] = linear(preCandidate, cacheZSCGD);
+        ACTS_VERBOSE("lin:  n=" << n << " tx=" << txl <<" ty=" << tyl << " chi2/ndf=" << chi2lin/(n-2));
         auto& refSelCand = selectedCandidates.emplace_back(Candidate({preCandidate.sourceLinks,iStation,{},chi2par,chi2ndf,tx,ty,k,varxx,varyy,varxy,0,0.,0.,0.}));
         for (auto& isl : refSelCand.sourceLinks){
           int straw = isl.geometryId().layer()*10000+isl.geometryId().sensitive();
