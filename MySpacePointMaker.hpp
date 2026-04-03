@@ -69,7 +69,6 @@ class MySpacePointMaker final : public IAlgorithm {
     double varyy = 0;
     double varxy = 0;
     int sharedStraws = 0;
-    int nGaps = 0;
     double x = 0;
     double y = 0;
     double z = 0;
