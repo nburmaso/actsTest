@@ -21,10 +21,17 @@ std::shared_ptr<MyFtdGeo> ftdGeo = nullptr;
 
 bool isGoodSP(int64_t layerMask, int st){
   int nHits = 0; // number of hits per station
+  int type5 = 0;
+  int type6 = 0;
   for (int l=0;l<nLayersPerStation;l++) {
-    if (ftdGeo->GetLayerType(l) == kPixel) continue;
+    int type = ftdGeo->GetLayerType(l);
+    if (type == kPixel) continue;
+    if (type == 5) type5++;
+    if (type == 6) type6++;
     nHits += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
   }
+  if (type5 == 0) return 0;
+  if (type6 == 0) return 0;
   if (nHits<3) return 0;
   return 1;
 }
@@ -109,13 +116,14 @@ void analyse_sp_efficiency(
   float varxx;
   float varxy;
   float varyy;
+  float majority;
   UInt_t sevent_id;
   ULong64_t sgeometry_id;
   ULong64_t smeas_id, smeas_id_2;
   tSpacepoints->SetBranchAddress("x",&sx);
   tSpacepoints->SetBranchAddress("y",&sy);
   tSpacepoints->SetBranchAddress("z",&sz);
-  tSpacepoints->SetBranchAddress("t",&varxy);
+  tSpacepoints->SetBranchAddress("t",&majority);
   tSpacepoints->SetBranchAddress("var_r",&varxx);  
   tSpacepoints->SetBranchAddress("var_z",&varyy);  
   tSpacepoints->SetBranchAddress("geometry_id",&sgeometry_id);
@@ -134,13 +142,10 @@ void analyse_sp_efficiency(
     }
     int station = ftdGeo->GetLayerStation(det->GeoIdToFtdLayer(Acts::GeometryIdentifier(sgeometry_id)));
     if (station != selected_station_sp) continue;
-    // printf("station %d\n", station);
-    auto& partIds = vMeasParticleIds[sevent_id];
-    for (auto id1 : partIds[smeas_id]) {
-      for (auto id2 : partIds[smeas_id_2]) {
-        if (id1!=id2) continue; // fake spoint
-        mSpoints[sevent_id][id1] += 1;
-      }
+    float majFrac = (majority - (long)majority) * 10.;
+    if (majFrac > 0.6) {
+      int majorityId = trunc(majority);
+      mSpoints[sevent_id][majorityId] += 1;
     }
   }
 
