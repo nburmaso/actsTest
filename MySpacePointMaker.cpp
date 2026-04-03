@@ -347,16 +347,8 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
 
       if (!(chi2ndf > m_cfg.maxChi2)) {
         auto& refSelCand = selectedUnfiltCandidates.emplace_back(Candidate({preCandidate.sourceLinks, iStation, {}, chi2par, chi2ndf, tx, ty, k}));
-        std::vector<int> layers;
-        layers.reserve(refSelCand.sourceLinks.size());
-        for (auto& isl : refSelCand.sourceLinks)
-          layers.push_back(det->GeoIdToFtdLayer(isl.geometryId()));
-        refSelCand.nGaps = 0;
-        for (std::size_t il = 1; il < layers.size(); ++il) {
-          int dLayer = layers[il] - layers[il - 1];
-          if (dLayer > 1) refSelCand.nGaps += (dLayer - 1);
-        }
       }
+
       ++it;
     }
 
@@ -378,7 +370,11 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
         auto& small = jt->sourceLinks;
         auto& large = it->sourceLinks;
         for (std::size_t i = 0; i < large.size() && j < small.size(); ++i) {
-          if (large[i].index() == small[j].index()) {
+          auto lGId = large[i].geometryId();
+          auto sGId = small[j].geometryId();
+          int largeStraw = lGId.layer() * 10000 + lGId.sensitive();
+          int smallStraw = sGId.layer() * 10000 + sGId.sensitive();
+          if (largeStraw == smallStraw) {
             ++j;
           }
         }
@@ -415,16 +411,13 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       return selectedCandidates[a].sharedStraws < selectedCandidates[b].sharedStraws;
     };
 
-    auto candidateComperator = [&selectedCandidates](std::size_t a, std::size_t b) {
-      const auto& ca = selectedCandidates[a];
-      const auto& cb = selectedCandidates[b];
-      int nMeasA = ca.sourceLinks.size();
-      int nMeasB = cb.sourceLinks.size();
-      double relSharedA = ca.sharedStraws/static_cast<double>(nMeasA);
-      double relSharedB = cb.sharedStraws/static_cast<double>(nMeasB);
-      if (ca.nGaps != cb.nGaps) return ca.nGaps < cb.nGaps;
-      if (std::abs(relSharedA - relSharedB) > 1e-2) return relSharedA < relSharedB;
-      if (nMeasA == nMeasB) return ca.chi2ndf < cb.chi2ndf;
+    auto candidateComperator =  [&selectedCandidates](std::size_t a, std::size_t b) {
+      int nMeasA = selectedCandidates[a].sourceLinks.size();
+      int nMeasB = selectedCandidates[b].sourceLinks.size();
+      auto relSharedA = 1.*selectedCandidates[a].sharedStraws/nMeasA;
+      auto relSharedB = 1.*selectedCandidates[b].sharedStraws/nMeasB;
+      if (relSharedA != relSharedB) return relSharedA < relSharedB;
+      if (nMeasA == nMeasB) return selectedCandidates[a].chi2 < selectedCandidates[b].chi2;
       return nMeasA > nMeasB;
     };
 
@@ -446,7 +439,6 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       ACTS_VERBOSE("Removing candidate " << badCandidate
                                          << " meas=" << selectedCandidates[badCandidate].sourceLinks.size()
                                          << " shared=" << selectedCandidates[badCandidate].sharedStraws
-                                         << " gaps=" << selectedCandidates[badCandidate].nGaps
                                          << " chi2ndf=" << selectedCandidates[badCandidate].chi2ndf);
       selectedCandidateIds.erase(badCandidate);
     }
