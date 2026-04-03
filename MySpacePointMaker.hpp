@@ -69,6 +69,7 @@ class MySpacePointMaker final : public IAlgorithm {
     double varyy = 0;
     double varxy = 0;
     int sharedStraws = 0;
+    int nGaps = 0;
     double x = 0;
     double y = 0;
     double z = 0;
@@ -80,7 +81,7 @@ class MySpacePointMaker final : public IAlgorithm {
 
  private:
 
-  std::tuple<double,double,double,double,double,double> linear(PreCandidate& cand, const std::vector<std::array<double, 5>>& cacheZSCGD, bool debug = 0) const;
+  std::tuple<double,double,double,double,double,double> linear(const std::vector<IndexSourceLink>& sourceLinks, const std::vector<std::array<double, 5>>& cacheZSCGD, bool debug = 0) const;
 
   std::tuple<double,double,double,double> parabolic(PreCandidate& cand, const std::vector<std::array<double, 5>>& cacheZSCGD, bool debug = 0) const;
 
