@@ -40,13 +40,6 @@ namespace straw_helpers
   using FtdLayerTypes = MyFtdGeo::FtdLayerTypes;
   using PreCandidate = ActsExamples::MySpacePointMaker::PreCandidate;
 
-  struct FirstTypeRefs {
-    int keyA = -1;
-    int keyB = -1;
-    ISL const* refA = nullptr;
-    ISL const* refB = nullptr;
-  };
-
   struct CandBuildCtx {
     std::vector<std::list<ISL>> const& mesPerLay;
     std::vector<int> const& layerTypes;
@@ -62,36 +55,50 @@ namespace straw_helpers
     int minMeasPerCand = 0;
   };
 
-
-  static inline ISL const* findRefForType(FirstTypeRefs const& refs, int typeKey) {
-    if (refs.keyA == typeKey) return refs.refA;
-    if (refs.keyB == typeKey) return refs.refB;
-    return nullptr;
+  static inline ISL const* getRefByIdx(PreCandidate const& cand, int idx) {
+    if (idx < 0 || idx >= static_cast<int>(cand.sourceLinks.size())) {
+      return nullptr;
+    }
+    return &cand.sourceLinks[idx];
   }
 
-  static inline ISL const* findOtherRef(FirstTypeRefs const& refs, int typeKey) {
-    if (refs.keyA != -1 && refs.keyA != typeKey) return refs.refA;
-    if (refs.keyB != -1 && refs.keyB != typeKey) return refs.refB;
-    return nullptr;
+  static inline int findRefIdxForType(PreCandidate const& cand, int typeKey) {
+    if (cand.refTypeA == typeKey) return cand.refIdxA;
+    if (cand.refTypeB == typeKey) return cand.refIdxB;
+    return -1;
   }
 
-  static inline void setFirstRefForType(FirstTypeRefs& refs, int typeKey, ISL const* isl) {
-    if (refs.keyA == typeKey) {
-      if (refs.refA == nullptr) refs.refA = isl;
+  static inline ISL const* findRefForType(PreCandidate const& cand, int typeKey) {
+    return getRefByIdx(cand, findRefIdxForType(cand, typeKey));
+  }
+
+  static inline int findOtherRefIdx(PreCandidate const& cand, int typeKey) {
+    if (cand.refTypeA != -1 && cand.refTypeA != typeKey) return cand.refIdxA;
+    if (cand.refTypeB != -1 && cand.refTypeB != typeKey) return cand.refIdxB;
+    return -1;
+  }
+
+  static inline ISL const* findOtherRef(PreCandidate const& cand, int typeKey) {
+    return getRefByIdx(cand, findOtherRefIdx(cand, typeKey));
+  }
+
+  static inline void setFirstRefForType(PreCandidate& cand, int typeKey, int idx) {
+    if (cand.refTypeA == typeKey) {
+      if (cand.refIdxA < 0) cand.refIdxA = idx;
       return;
     }
-    if (refs.keyB == typeKey) {
-      if (refs.refB == nullptr) refs.refB = isl;
+    if (cand.refTypeB == typeKey) {
+      if (cand.refIdxB < 0) cand.refIdxB = idx;
       return;
     }
-    if (refs.keyA == -1) {
-      refs.keyA = typeKey;
-      refs.refA = isl;
+    if (cand.refTypeA == -1) {
+      cand.refTypeA = typeKey;
+      cand.refIdxA = idx;
       return;
     }
-    if (refs.keyB == -1) {
-      refs.keyB = typeKey;
-      refs.refB = isl;
+    if (cand.refTypeB == -1) {
+      cand.refTypeB = typeKey;
+      cand.refIdxB = idx;
     }
   }
 
@@ -115,8 +122,7 @@ namespace straw_helpers
                       int station,
                       CandBuildCtx const& ctx,
                       std::list<PreCandidate>& cands,
-                      PreCandidate& cand,
-                      FirstTypeRefs& refs)
+                      PreCandidate& cand)
   {
     const int layerInStation = layerId % ctx.nLayPerSt;
     const int layersLeft = ctx.nLayPerSt - layerInStation;
@@ -133,16 +139,16 @@ namespace straw_helpers
     }
 
     if (ctx.ftdGeo->GetLayerType(layerId) == FtdLayerTypes::kPixel) {
-      constructCands(layerId + 1, station, ctx, cands, cand, refs);
+      constructCands(layerId + 1, station, ctx, cands, cand);
       return;
     }
 
-    auto const& curLayerList = ctx.mesPerLay[layerId];
+    const auto& curLayerList = ctx.mesPerLay[layerId];
     const int layTypeKey = static_cast<int>(ctx.layerTypes[layerId]);
     const int nStraws = ctx.nTubesPerLayer[layerId];
 
-    ISL const* sameTypeRef = findRefForType(refs, layTypeKey);
-    ISL const* otherTypeRef = findOtherRef(refs, layTypeKey);
+    ISL const* sameTypeRef = findRefForType(cand, layTypeKey);
+    ISL const* otherTypeRef = findOtherRef(cand, layTypeKey);
 
     const int sameRefStrawId = (sameTypeRef != nullptr) ? sameTypeRef->geometryId().sensitive() : -1;
     const int otherRefStrawId = (otherTypeRef != nullptr) ? otherTypeRef->geometryId().sensitive() : -1;
@@ -153,13 +159,21 @@ namespace straw_helpers
       if (sameTypeRef != nullptr) ok = passesAgainstRefStraw(strawId, sameRefStrawId, ctx.maxLoDeltaPStrawId, ctx.maxLoDeltaMStrawId, nStraws);
       if (ok && otherTypeRef != nullptr) ok = passesAgainstRefStraw(strawId, otherRefStrawId, ctx.maxHiDeltaPStrawId, ctx.maxHiDeltaMStrawId, nStraws);
       if (!ok) continue;
-      if (sameTypeRef == nullptr) setFirstRefForType(refs, layTypeKey, &isl);
+      const int oldRefTypeA = cand.refTypeA;
+      const int oldRefTypeB = cand.refTypeB;
+      const int oldRefIdxA  = cand.refIdxA;
+      const int oldRefIdxB  = cand.refIdxB;
       cand.sourceLinks.push_back(isl);
-      constructCands(layerId + 1, station, ctx, cands, cand, refs);
+      if (sameTypeRef == nullptr) setFirstRefForType(cand, layTypeKey, static_cast<int>(cand.sourceLinks.size()) - 1);
+      constructCands(layerId + 1, station, ctx, cands, cand);
       cand.sourceLinks.pop_back();
+      cand.refTypeA = oldRefTypeA;
+      cand.refTypeB = oldRefTypeB;
+      cand.refIdxA  = oldRefIdxA;
+      cand.refIdxB  = oldRefIdxB;
     }
 
-    constructCands(layerId + 1, station, ctx, cands, cand, refs);
+    constructCands(layerId + 1, station, ctx, cands, cand);
   }
 }
 
@@ -223,6 +237,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   for (const auto& isl : measurements.orderedIndices()) {
     const auto geoId = isl.geometryId();
     int iLayer = det->GeoIdToFtdLayer(geoId);
+    if (ftdGeo->GetLayerType(iLayer) == FtdLayerTypes::kPixel) continue;
     mesPerLay[iLayer].emplace_back(isl);
     Acts::SourceLink slink{isl};
     // tube center shifted by the measured distance to wire
@@ -246,15 +261,25 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   const std::vector<int>& layerTypes = ftdGeo->GetLayerTypes();
   auto vActsLayerToFtdLayer = det->GetActsLayerToFtdLayer();
 
+  std::vector<int> vFirstLayInStation{};
+  int firstLay = -1;
+  int prevStation = -1;
+  for (int iL = 0; iL < nLayers; ++iL) {
+    int station = ftdGeo->GetLayerStation(iL);
+    if (ftdGeo->GetLayerType(iL) == FtdLayerTypes::kPixel) continue;
+    if (station != prevStation) {
+      prevStation = station;
+      firstLay = iL;
+      vFirstLayInStation.push_back(firstLay);
+    }
+  }
+
   // construct straw spacepoints
   std::vector<std::list<PreCandidate>> preCandidates(nStations);
-  for (int iL = 0; iL < nLayers; ++iL) {
-    int layerType = ftdGeo->GetLayerType(iL);
-    if (layerType == FtdLayerTypes::kPixel) continue;
+  for (auto iL : vFirstLayInStation) {
     int station = ftdGeo->GetLayerStation(iL);
     if (station==1 || station==3) continue;
     auto& candList = preCandidates[station];
-    straw_helpers::FirstTypeRefs emptyRefs;
     PreCandidate cand;  // starts empty
     int maxLoDeltaPStrawId, maxHiDeltaPStrawId;
     int maxLoDeltaMStrawId, maxHiDeltaMStrawId;
@@ -269,7 +294,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
                                          maxLoDeltaPStrawId, maxLoDeltaMStrawId,
                                          maxHiDeltaPStrawId, maxHiDeltaMStrawId,
                                          m_cfg.minMeasPerCand};
-    straw_helpers::constructCands(iL, station, buildCtx, candList, cand, emptyRefs);
+    straw_helpers::constructCands(iL, station, buildCtx, candList, cand);
   }
 
   // construct everything else
@@ -304,7 +329,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
   SimSpacePointContainer spacePoints;
 
   for (int iStation=0;iStation<nStations;iStation++) {
-    ACTS_VERBOSE("Station " << iStation << ": number of filtered candidates " << preCandidates[iStation].size());
+    ACTS_INFO("Station " << iStation << ": number of filtered candidates " << preCandidates[iStation].size());
     std::vector<Candidate> selectedCandidates;
     std::set<int> selectedCandidateIds;
     std::map<int,std::set<int>> candidatesPerStraw;
@@ -313,6 +338,11 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       auto& preCandidate = *it;
       ACTS_VERBOSE("  candidate.size=" << preCandidate.sourceLinks.size());
       int n = preCandidate.sourceLinks.size();
+      printf("station %d: ", iStation);
+      for (const auto& isl : preCandidate.sourceLinks) {
+        printf("%d ", vActsLayerToFtdLayer->at(isl.geometryId().layer()));
+      }
+      printf("\n");
       auto [chi2lin, txl, tyl, varxx, varyy, varxy] = linear(preCandidate, cacheZSCGD);
       ACTS_VERBOSE("lin:  n=" << n << " tx=" << txl <<" ty=" << tyl << " chi2/ndf=" << chi2lin/(n-2));
       auto [chi2par, tx, ty, k] = parabolic(preCandidate, cacheZSCGD);
