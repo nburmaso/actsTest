@@ -132,8 +132,7 @@ namespace straw_helpers
       return;
 
     if (layerId >= ctx.nLayers || ctx.ftdGeo->GetLayerStation(layerId) != station) {
-      if (static_cast<int>(cand.sourceLinks.size()) >= ctx.minMeasPerCand &&
-          cand.refTypeA != -1 && cand.refTypeB != -1 && cand.refTypeA != cand.refTypeB)
+      if (static_cast<int>(cand.sourceLinks.size()) >= ctx.minMeasPerCand && cand.refTypeA != -1 && cand.refTypeB != -1)
         cands.emplace_back(cand);
       return;
     }
