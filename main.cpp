@@ -51,25 +51,18 @@ int main(int argc, char *argv[]){
   // default parameters
   TString inputDir = "none";
   TString outputDir = "test";
-//  TString outputDir = "roc_pi_16_7deg";
-  int nEvents = 10000 ;
-  //Acts::PdgParticle pdgCode = Acts::eProton;
-  Acts::PdgParticle pdgCode = Acts::ePionPlus;
-  double etaMin = 1.6;
-  double vzMax = 50;
-  double radLengthPerSeed = 0.01;
+  int nThreads = 12;
+  int nEvents = 10000;
+  int nParticles = 1;
+  double etaMin = 1.9;
+  double etaMax = 1.901;
+  double ptMin = 0.2;
+  double ptMax = 1.0;
+  int minMeasPerCand = 3;
+  bool doDuplicateStrawMeasurements = false;
 
-  // double ptMin = 0.950_GeV;
-  // double ptMax = 1.000_GeV+1.e-100_GeV;
-  // double ptMin = 0.100_GeV;
-  // double ptMax = 1.000_GeV +1e-100_GeV;
-  // double ptMin = 0.100_GeV;
-  // double ptMax = 1.000_GeV +1e-100_GeV;
-  double ptMin = 0.100_GeV;
-  double ptMax = 0.101_GeV;
+  Acts::PdgParticle pdgCode = Acts::ePionPlus; //Acts::eProton;
 
-  // double ptMin = 0.350_GeV;
-  // double ptMax = 0.350_GeV +1e-100_GeV;
   // non-default setup
   if (argc>=4) {
     inputDir = argv[1];
@@ -84,16 +77,12 @@ int main(int argc, char *argv[]){
     if (pdg.Contains("mu")) pdgCode = Acts::eAntiMuon;
     etaMin = TString(argv[5]).Atof();
   }
-  if (argc>=7) vzMax = TString(argv[6]).Atof();
-  if (argc>=8) radLengthPerSeed = TString(argv[7]).Atof();
 
   bool isroc = !outputDir.Contains("noroc");
   bool isframe = !outputDir.Contains("noframe");
   isroc = 1;
   isframe = 1;
   
-  printf("Running acts: %d eta=%.1f vzMax=%.0f\n", pdgCode, etaMin, vzMax);
-
   inputDir.Append("/");
   outputDir.Append("/");
   std::filesystem::create_directory(outputDir.Data());
@@ -123,29 +112,18 @@ int main(int argc, char *argv[]){
   auto rnd = std::make_shared<ActsExamples::RandomNumbers>(ActsExamples::RandomNumbers::Config({42}));
 
   // Particle gun generator config
-  double etaMax = etaMin + 1.e-4;
-
   ActsExamples::ParametricParticleGenerator::Config genCfg;
   genCfg.etaUniform = true;
   genCfg.pTransverse = true;
   genCfg.pdg = pdgCode;
   // genCfg.phiMin = M_PI/180.*45.;
   // genCfg.phiMax = M_PI/180.*45.00001;
-
-  // genCfg.thetaMin = 2 * atan(exp(-etaMax));
-  // genCfg.thetaMax = 2 * atan(exp(-etaMin));
-  // genCfg.thetaMin = 2 * atan(exp(-1.61));
-  // genCfg.thetaMax = 2 * atan(exp(-1.60));
-  // genCfg.thetaMin = 2 * atan(exp(-1.91));
-  // genCfg.thetaMax = 2 * atan(exp(-1.90));
-  genCfg.thetaMin = 2 * atan(exp(-1.95));
-  genCfg.thetaMax = 2 * atan(exp(-1.55));
-
-  genCfg.pMin = 0.2;
-  genCfg.pMax = 1.0;
-
+  genCfg.thetaMin = 2 * atan(exp(-etaMax));
+  genCfg.thetaMax = 2 * atan(exp(-etaMin));
+  genCfg.pMin = ptMin;
+  genCfg.pMax = ptMax;
   genCfg.randomizeCharge = true;
-  genCfg.numParticles = 1;
+  genCfg.numParticles = nParticles;
   ActsExamples::EventGenerator::Generator gen{
       std::make_shared<ActsExamples::FixedMultiplicityGenerator>(1),
       std::make_shared<ActsExamples::FixedPrimaryVertexPositionGenerator>(),
@@ -219,8 +197,7 @@ int main(int argc, char *argv[]){
 
   // Digitization config
   ActsExamples::MyDigitizationAlgorithm::Config digiCfg;
-  digiCfg.doDuplicateStrawMeasurements = false;
-//  digiCfg.doDuplicateStrawMeasurements = true;
+  digiCfg.doDuplicateStrawMeasurements = doDuplicateStrawMeasurements;
   //ActsExamples::DigitizationAlgorithm::Config digiCfg;
   digiCfg.inputSimHits = simhits;
   digiCfg.randomNumbers = rnd;
@@ -252,7 +229,7 @@ int main(int argc, char *argv[]){
   spCfg.maxHiDeltaPStrawId1 = 4;  spCfg.maxHiDeltaMStrawId1 = 6;  // ST0
   spCfg.maxHiDeltaPStrawId2 = 5;  spCfg.maxHiDeltaMStrawId2 = 8;  // ST2
   spCfg.maxHiDeltaPStrawId3 = 6;  spCfg.maxHiDeltaMStrawId3 = 10; // ST4
-  spCfg.minMeasPerCand = 3;
+  spCfg.minMeasPerCand = minMeasPerCand;
   spCfg.maxChi2 = 10;
   spCfg.maximumIterations = 100000;
   spCfg.maximumSharedStraws = 1;
@@ -270,15 +247,13 @@ int main(int argc, char *argv[]){
   // truthSeedingCfg.deltaRMax = 100._mm;
 
   // Seeding
-  //int iB = 0, iM = 18, iF = 36;
-  //int iB = 3, iM = 17, iF = 31;
-  //int iB = 4, iM = 6, iF = 8;
-  //int iB = 0, iM = 2, iF = 4;
   double rMaxStation = ftdGeo->GetLayerRMax(ftdGeo->GetNumberOfLayers()-1);
   auto positions = ftdGeo->GetLayerPositions();
   int iB = 0;
   int iM = ftdGeo->GetNumberOfLayers() / 2;
   int iF = ftdGeo->GetNumberOfLayers() - 1;
+  double vzMax = 50;
+  double radLengthPerSeed = 0.01;
 
   ActsExamples::SeedingAlgorithm::Config seedingCfg;
   seedingCfg.inputSpacePoints = {spacepoints};
@@ -453,7 +428,7 @@ int main(int argc, char *argv[]){
 
   // Sequencer config
   ActsExamples::Sequencer::Config sequencerCfg;
-  sequencerCfg.numThreads = 12;
+  sequencerCfg.numThreads = nThreads;
   sequencerCfg.events = nEvents;
   sequencerCfg.logLevel = logLevelF;
 
