@@ -51,15 +51,15 @@ int main(int argc, char *argv[]){
   // default parameters
   TString inputDir = "none";
   TString outputDir = "test";
-  int nThreads = 12;
-  int nEvents = 10000;
-  int nParticles = 1;
-  double etaMin = 1.9;
-  double etaMax = 1.901;
+  int nThreads = 1;
+  int nEvents = 1;
+  int nParticles = 90;
+  double etaMin = 1.55;
+  double etaMax = 1.951;
   double ptMin = 0.2;
   double ptMax = 1.0;
   int minMeasPerCand = 3;
-  bool doDuplicateStrawMeasurements = false;
+  bool doDuplicateStrawMeasurements = true;
 
   Acts::PdgParticle pdgCode = Acts::ePionPlus; //Acts::eProton;
 
@@ -232,7 +232,8 @@ int main(int argc, char *argv[]){
   spCfg.minMeasPerCand = minMeasPerCand;
   spCfg.maxChi2 = 10;
   spCfg.maximumIterations = 100000;
-  spCfg.maximumSharedStraws = 1;
+  spCfg.maximumSharedStraws = 3;
+  spCfg.maximumAllowedCandidatesPerStraw = 3;
   spCfg.outputSpacePoints = spacepoints;
   spCfg.geometrySelection = {Acts::GeometryIdentifier{}};
 

@@ -1,5 +1,5 @@
-R__ADD_INCLUDE_PATH(/mnt/nvme0n1/nica/actsTest/build/stage/include)
-R__ADD_LIBRARY_PATH(/mnt/nvme0n1/nica/actsTest/build/stage/lib)
+R__ADD_INCLUDE_PATH(/home/ekryshen/mpd/actsTest/build/stage/include)
+R__ADD_LIBRARY_PATH(/home/ekryshen/mpd/actsTest/build/stage/lib)
 R__LOAD_LIBRARY(libactsTestLib.so)
 #include "TFile.h"
 #include "TTree.h"
@@ -37,8 +37,8 @@ bool isGoodSP(int64_t layerMask, int st){
 }
 
 void analyse_sp_efficiency(
-  std::string inputDir = "./test/",
-  double etaMean = 1.9, double etaDif = 0.1,
+  std::string inputDir = "../build/test/",
+  double etaMean = 1.75, double etaDif = 0.2,
   int selected_station_sp = 0)
 {
   det = std::make_shared<MyFtdDetector>();
@@ -189,7 +189,9 @@ void analyse_sp_efficiency(
   hEffSpPtPi->Divide(hSpRcPtPi, hSpablePtPi, 1, 1, "B");
   hEffSpPtPi->Draw();
   c->Print(Form("%s/sp_eff_pt_pi.png", inputDir.c_str()));
-
+  float rc = hSpRcPtPi->Integral();
+  float spable = hSpablePtPi->Integral();
+  printf("%.0f/%.0f=%.4f\n",rc, spable, rc/spable);
   auto* fout = new TFile(Form("%s/sp_efficiency.root", inputDir.c_str()), "update");
   hSpRcPtPi->Write(hSpRcPtPi->GetName(),TObject::kOverwrite);
   hSpRcPtPr->Write(hSpRcPtPr->GetName(),TObject::kOverwrite);

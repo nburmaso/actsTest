@@ -46,6 +46,7 @@ class MySpacePointMaker final : public IAlgorithm {
     double maxChi2{10.};
     int maximumIterations{10000};
     int maximumSharedStraws{1};
+    int maximumAllowedCandidatesPerStraw{2};
   };
 
   struct PreCandidate {
@@ -65,13 +66,7 @@ class MySpacePointMaker final : public IAlgorithm {
     double tx = 0;
     double ty = 0;
     double k = 0;
-    double varxx = 0;
-    double varyy = 0;
-    double varxy = 0;
     int sharedStraws = 0;
-    double x = 0;
-    double y = 0;
-    double z = 0;
   };
 
   MySpacePointMaker(Config cfg, Acts::Logging::Level lvl);

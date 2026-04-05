@@ -335,58 +335,56 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     ACTS_INFO("Station " << iStation << ": number of precandidates " << preCandidatesSt.size());
 
     std::vector<Candidate> selectedUnfiltCandidates;
-    for (auto it = preCandidatesSt.begin(); it != preCandidatesSt.end();) {
-      auto& preCandidate = *it;
-      ACTS_VERBOSE("  candidate.size=" << preCandidate.sourceLinks.size());
-
-      int n = preCandidate.sourceLinks.size();
+    for (auto& preCandidate: preCandidatesSt){
+      int nlinks = preCandidate.sourceLinks.size();
+      ACTS_VERBOSE("  candidate.size=" << nlinks);
       auto [chi2par, tx, ty, k] = parabolic(preCandidate, cacheZSCGD);
-      double chi2ndf = n > 3 ? chi2par / (n - 3) : chi2par;
-
-      ACTS_VERBOSE("par:  n=" << n << " tx=" << tx <<" ty=" << ty << " chi2/ndf=" << chi2ndf);
-
-      if (!(chi2ndf > m_cfg.maxChi2)) {
-        auto& refSelCand = selectedUnfiltCandidates.emplace_back(Candidate({preCandidate.sourceLinks, iStation, {}, chi2par, chi2ndf, tx, ty, k}));
-      }
-
-      ++it;
+      double chi2ndf = nlinks > 3 ? chi2par / (nlinks - 3) : chi2par;
+      ACTS_VERBOSE("par:  nlinks=" << nlinks << " tx=" << tx <<" ty=" << ty << " chi2/ndf=" << chi2ndf);
+      if (chi2ndf > m_cfg.maxChi2) continue;
+      auto& refSelCand = selectedUnfiltCandidates.emplace_back(Candidate({preCandidate.sourceLinks, iStation, {}, chi2par, chi2ndf, tx, ty, k}));
+      // uncomment to debug precandidates
+      // printf("station %d: chi2/ndf=%e particles: ", refSelCand.station, refSelCand.chi2ndf);
+      // for (auto& isl : refSelCand.sourceLinks) printf("%d ", particleIds[isl.index()]);
+      // printf("\n");
     }
 
     preCandidatesSt.clear();
+    ACTS_INFO("Station " << iStation << ": precandidates after chi2=" << selectedUnfiltCandidates.size());
 
     std::vector<Candidate> selectedCandidates;
     std::set<int> selectedCandidateIds;
     std::map<int,std::set<int>> candidatesPerStraw;
     int iSelCand = 0;
 
+    // sort from smallest to largest
     std::sort(selectedUnfiltCandidates.begin(), selectedUnfiltCandidates.end(),
-              [](const Candidate& a, const Candidate& b) { return a.sourceLinks.size() > b.sourceLinks.size(); });
-
-    for (auto it = selectedUnfiltCandidates.begin(); it != selectedUnfiltCandidates.end(); ++it) {
-      auto jt = std::next(it);
+              [](const Candidate& a, const Candidate& b) { return a.sourceLinks.size() < b.sourceLinks.size(); }); 
+    
+    for (auto it = selectedUnfiltCandidates.begin(); it != selectedUnfiltCandidates.end(); ++it) { // take smallest first
       bool isSub = false;
-      while (jt != selectedUnfiltCandidates.end()) {
-        std::size_t j = 0;
-        auto& small = jt->sourceLinks;
-        auto& large = it->sourceLinks;
-        for (std::size_t i = 0; i < large.size() && j < small.size(); ++i) {
-          auto lGId = large[i].geometryId();
-          auto sGId = small[j].geometryId();
+      for (auto jt = selectedUnfiltCandidates.rbegin(); jt != selectedUnfiltCandidates.rend(); ++jt) { // take largest first
+        if (it == jt.base() - 1) break; // stop if jt = it
+        std::size_t i = 0; // 
+        auto& small = it->sourceLinks;
+        auto& large = jt->sourceLinks;
+        for (std::size_t j = 0; j < large.size() && i < small.size(); ++j) {
+          auto lGId = large[j].geometryId();
+          auto sGId = small[i].geometryId();
           int largeStraw = lGId.layer() * 10000 + lGId.sensitive();
           int smallStraw = sGId.layer() * 10000 + sGId.sensitive();
           if (largeStraw == smallStraw) {
-            ++j;
+            ++i;
           }
         }
-        if (j == small.size()) {
+        if (i == small.size()) {
           isSub = true;
           break;
-        } else {
-          ++jt;
         }
       }
       if (isSub) continue;
       auto& refSelCand = selectedCandidates.emplace_back(*it);
+
       for (auto& isl : refSelCand.sourceLinks) {
         int straw = isl.geometryId().layer() * 10000 + isl.geometryId().sensitive();
         refSelCand.straws.push_back(straw);
@@ -404,7 +402,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     ACTS_VERBOSE("Info on shared measurements...");
     for (auto& candidate : selectedCandidates) {
       for (auto straw : candidate.straws)
-        if (candidatesPerStraw[straw].size() > 1) candidate.sharedStraws++;
+        if (candidatesPerStraw[straw].size() > m_cfg.maximumAllowedCandidatesPerStraw) candidate.sharedStraws++;
     }
 
     auto sharedStrawsComperator = [&selectedCandidates](std::size_t a, std::size_t b) {
@@ -431,10 +429,9 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       // remove bad track
       for (auto straw : selectedCandidates[badCandidate].straws) {
         candidatesPerStraw[straw].erase(badCandidate);
-        if (candidatesPerStraw[straw].size()>1) continue;
-        // only one candidate left
-        auto it = *candidatesPerStraw[straw].begin();
-        selectedCandidates[it].sharedStraws--;
+        if (candidatesPerStraw[straw].size()>m_cfg.maximumAllowedCandidatesPerStraw) continue;
+        // reducing shared straws for corresponding candidates
+        for (auto it : candidatesPerStraw[straw]) selectedCandidates[it].sharedStraws--;
       }
       ACTS_VERBOSE("Removing candidate " << badCandidate
                                          << " meas=" << selectedCandidates[badCandidate].sourceLinks.size()
@@ -443,16 +440,16 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       selectedCandidateIds.erase(badCandidate);
     }
 
-    ACTS_INFO("Station " << iStation << ": number of candidates after amb. res." << selectedCandidateIds.size());
-
     ACTS_VERBOSE("Selected candidates...");
     for (auto& id : selectedCandidateIds) {
       auto& sp = selectedCandidates[id];
       int nlinks = sp.sourceLinks.size();
+
       // printf("station %d: chi2/ndf=%e particles: ", sp.station, sp.chi2ndf);
       // for (auto& isl : sp.sourceLinks) printf("%d ", particleIds[isl.index()]);
       // printf("\n");
-      // find majority particle id and majority ratio
+
+      ACTS_VERBOSE("finding majority particle id and majority ratio for spacepoint" << id);
       auto identifyContributingParticles = [&sp, &particleIds]() {
         std::vector<std::pair<int, int>> particleCounts;
         for (auto& isl : sp.sourceLinks) {
@@ -461,7 +458,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
           if (it != particleCounts.end()) {
             it->second += 1u;
           } else {
-            particleCounts.push_back({particleId, 1u});
+            particleCounts.emplace_back(particleId, 1u);
           }
         }
         std::ranges::sort(particleCounts, std::greater{},[](const auto& p) { return p.second; });
@@ -476,19 +473,16 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       Acts::SourceLink slink1{sp.sourceLinks[0]};
       Acts::SourceLink slink2{sp.sourceLinks[nlinks-1]};
       const Acts::Surface* surface = m_slSurfaceAccessor.value()(slink1);
-      sp.z = surface->center(ctx.geoContext)[2];
-      sp.x = sp.tx * sp.z + sp.k * sp.ty * sp.z * sp.z;
-      sp.y = sp.ty * sp.z - sp.k * sp.tx * sp.z * sp.z;
+      double z = surface->center(ctx.geoContext)[2];
+      double x = sp.tx * z + sp.k * sp.ty * z * z;
+      double y = sp.ty * z - sp.k * sp.tx * z * z;
       auto [chi2lin, txl, tyl, varxx, varyy, varxy] = linear(sp.sourceLinks, cacheZSCGD);
       ACTS_VERBOSE("lin:  n=" << nlinks << " tx=" << txl <<" ty=" << tyl << " chi2/ndf=" << chi2lin/(nlinks-2));
-      sp.varxx = varxx;
-      sp.varyy = varyy;
-      sp.varxy = varxy;
       // printf("Candidate %d, meas: %d, shared: %d, chi2=%f\n", id, sp.sourceLinks.size(), sp.sharedStraws, sp.chi2);
-      ACTS_VERBOSE("SP: k=" << sp.k << " x=" << sp.x << " y=" << sp.y << " z=" << sp.z << " var_xy=" << sp.varxy*sp.z*sp.z);
+      ACTS_VERBOSE("SP: k=" << sp.k << " x=" << x << " y=" << y << " z=" << z << " var_xy=" << varxy*z*z);
       boost::container::static_vector<Acts::SourceLink, 2> slinks = {slink1, slink2};
-      Acts::Vector3 pos{sp.x,sp.y,sp.z};
-      double var_r = (sp.x*sp.x*sp.varxx + sp.y*sp.y*sp.varyy + 2*sp.x*sp.y*sp.varxy)/(sp.x*sp.x+sp.y*sp.y);
+      Acts::Vector3 pos{x, y, z};
+      double var_r = (x*x*varxx + y*y*varyy + 2*x*y*varxy)/(x*x+y*y);
       double var_z = 0.1;
       if (var_r>1e-5) continue;
       //std::back_inserter(spacePoints) = SimSpacePoint(pos, sp.chi2ndf*Acts::UnitConstants::ns, var_r, var_z, 0, slinks);
