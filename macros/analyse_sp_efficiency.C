@@ -12,6 +12,7 @@ R__LOAD_LIBRARY(libactsTestLib.so)
 const int nStations = 5;
 const int nLayersPerStation = 9;
 const int shift = 2;
+const int minMeasPerCand = 3;
 
 int kPixel = 2;
 
@@ -26,18 +27,21 @@ bool isGoodSP(int64_t layerMask, int st){
   for (int l=0;l<nLayersPerStation;l++) {
     int type = ftdGeo->GetLayerType(l);
     if (type == kPixel) continue;
+    bool isHit = ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
+    if (!isHit) continue;
     if (type == 5) type5++;
     if (type == 6) type6++;
-    nHits += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
+    nHits++;
   }
   if (type5 == 0) return 0;
   if (type6 == 0) return 0;
-  if (nHits<3) return 0;
+  if (nHits<minMeasPerCand) return 0;
   return 1;
 }
 
 void analyse_sp_efficiency(
-  std::string inputDir = "../build/test/",
+//  std::string inputDir = "../build/test/",
+  std::string inputDir = "../build/nodup/",
   double etaMean = 1.75, double etaDif = 0.2,
   int selected_station_sp = 0)
 {
@@ -143,7 +147,7 @@ void analyse_sp_efficiency(
     int station = ftdGeo->GetLayerStation(det->GeoIdToFtdLayer(Acts::GeometryIdentifier(sgeometry_id)));
     if (station != selected_station_sp) continue;
     float majFrac = (majority - (long)majority) * 10.;
-    if (majFrac > 0.6) {
+    if (majFrac > 0.5) {
       int majorityId = trunc(majority);
       mSpoints[sevent_id][majorityId] += 1;
     }
