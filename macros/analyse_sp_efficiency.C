@@ -40,8 +40,7 @@ bool isGoodSP(int64_t layerMask, int st){
 }
 
 void analyse_sp_efficiency(
-//  std::string inputDir = "../build/test/",
-  std::string inputDir = "../build/nodup/",
+  std::string inputDir = "../build/test/",
   double etaMean = 1.75, double etaDif = 0.2,
   int selected_station_sp = 0)
 {
@@ -110,6 +109,12 @@ void analyse_sp_efficiency(
     }
   }
 
+  std::vector<std::vector<int>> mSpoints(nEvents);
+  for (int ev=0;ev<nEvents;ev++){ // events
+    tPart->GetEntry(ev);
+    mSpoints[ev].resize(part_pdg->size()+1,0);
+  }
+
   TFile* fSpacepoints = new TFile(Form("%s/spacepoints.root", inputDir.c_str()));
   TTree* tSpacepoints = (TTree*) fSpacepoints->Get("spacepoints");
   tSpacepoints->Print();
@@ -135,8 +140,6 @@ void analyse_sp_efficiency(
   tSpacepoints->SetBranchAddress("measurement_id", &smeas_id);
   tSpacepoints->SetBranchAddress("measurement_id_2", &smeas_id_2);
 
-  std::map<int, std::map<int, int>> mSpoints;
-
   int previous_sevent_id = -1;
   for (int is=0;is<tSpacepoints->GetEntries();is++){
     tSpacepoints->GetEntry(is);
@@ -146,9 +149,10 @@ void analyse_sp_efficiency(
     }
     int station = ftdGeo->GetLayerStation(det->GeoIdToFtdLayer(Acts::GeometryIdentifier(sgeometry_id)));
     if (station != selected_station_sp) continue;
-    float majFrac = (majority - (long)majority) * 10.;
+    int majorityId = trunc(majority);
+    float majFrac = (majority - majorityId) * 10.;
+    // printf("majorityId=%d majFrac=%f\n", majorityId, majFrac);
     if (majFrac > 0.5) {
-      int majorityId = trunc(majority);
       mSpoints[sevent_id][majorityId] += 1;
     }
   }
@@ -170,21 +174,12 @@ void analyse_sp_efficiency(
       float eta = part_eta->at(ip);
       float phi = part_phi->at(ip);
       if (abs(eta-etaMean)>etaDif || abs(vz)>1.) continue;
-      if (isGoodSP(ftdLayerMask, selected_station_sp)) {
-        if (abs(pdg)== 211) hSpablePtPi->Fill(pt);
-        if (abs(pdg)==2212) hSpablePtPr->Fill(pt);
-        auto itMapSPointsEvent = mSpoints.find(ev);
-        if (itMapSPointsEvent != mSpoints.end()) {
-          auto& mapSPointsEvent = itMapSPointsEvent->second;
-          auto itSpPart = mapSPointsEvent.find(ip);
-          if (itSpPart != mapSPointsEvent.end()) {
-            if (itSpPart->second > 0) {
-              if (abs(pdg)== 211) hSpRcPtPi->Fill(pt);
-              if (abs(pdg)==2212) hSpRcPtPr->Fill(pt);
-            }
-          }
-        }
-      }
+      if (!isGoodSP(ftdLayerMask, selected_station_sp)) continue;
+      if (abs(pdg)== 211) hSpablePtPi->Fill(pt);
+      if (abs(pdg)==2212) hSpablePtPr->Fill(pt);
+      if (mSpoints[ev][ip+1]==0) continue; // +1 since particleId is counted from 1
+      if (abs(pdg)== 211) hSpRcPtPi->Fill(pt);
+      if (abs(pdg)==2212) hSpRcPtPr->Fill(pt);
     }
   }
 
