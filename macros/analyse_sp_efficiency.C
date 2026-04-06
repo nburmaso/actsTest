@@ -41,15 +41,32 @@ bool isGoodSP(int64_t layerMask, int st){
 }
 
 void analyse_sp_efficiency(
-  std::string inputDir = "../build/nodup1/",
+  std::string inputDir = "../build/test/",
   double etaMean = 1.75, double etaDif = 0.2,
   int selected_station_sp = 0)
 {
+  // gStyle->SetOptStat(0);
+
+  #define axisPt 100,0.,1.
+  #define axisPhi 90,-M_PI,M_PI
+  #define axisEta 50,1.5,2.0
+
+  TH1D* hSpMcPtPi   = new TH1D(Form("hSpMcPtPi%.0f_%d",   etaMean*10, selected_station_sp),"",axisPt);
+  TH1D* hSpMcPtPr   = new TH1D(Form("hSpMcPtPr%.0f_%d",   etaMean*10, selected_station_sp),"",axisPt);
+  TH1D* hSpRcPtPi   = new TH1D(Form("hSpRcPtPi%.0f_%d",   etaMean*10, selected_station_sp),"",axisPt);
+  TH1D* hSpRcPtPr   = new TH1D(Form("hSpRcPtPr%.0f_%d",   etaMean*10, selected_station_sp),"",axisPt);
+  TH1D* hSpablePtPi = new TH1D(Form("hSpablePtPi%.0f_%d", etaMean*10, selected_station_sp),"",axisPt);
+  TH1D* hSpablePtPr = new TH1D(Form("hSpablePtPr%.0f_%d", etaMean*10, selected_station_sp),"",axisPt);
+  
+  TH1D* hSpMcEtaPi   = new TH1D(Form("hSpMcEtaPi%.0f_%d",   etaMean*10, selected_station_sp),"",axisEta);
+  TH1D* hSpMcEtaPr   = new TH1D(Form("hSpMcEtaPr%.0f_%d",   etaMean*10, selected_station_sp),"",axisEta);
+  TH1D* hSpableEtaPi = new TH1D(Form("hSpableEtaPi%.0f_%d", etaMean*10, selected_station_sp),"",axisEta);
+  TH1D* hSpableEtaPr = new TH1D(Form("hSpableEtaPr%.0f_%d", etaMean*10, selected_station_sp),"",axisEta);
+
   det = std::make_shared<MyFtdDetector>();
   trackingGeometry = det->GetTrackingGeometry(true, true, true, false);
   ftdGeo = det->FtdGeo();
 
-  // gStyle->SetOptStat(0);
   // setup particles
   TFile* fPart = new TFile(Form("%s/particles.root", inputDir.c_str()));
   TTree* tPart = (TTree*) fPart->Get("particles");
@@ -156,40 +173,28 @@ void analyse_sp_efficiency(
     }
   }
 
-  TH1D* hSpMcPtPi   = new TH1D(Form("hSpMcPtPi%.0f_%d",   etaMean*10, selected_station_sp),"",50,0.,1.);
-  TH1D* hSpMcPtPr   = new TH1D(Form("hSpMcPtPr%.0f_%d",   etaMean*10, selected_station_sp),"",50,0.,1.);
-  TH1D* hSpRcPtPi   = new TH1D(Form("hSpRcPtPi%.0f_%d",   etaMean*10, selected_station_sp),"",50,0.,1.);
-  TH1D* hSpRcPtPr   = new TH1D(Form("hSpRcPtPr%.0f_%d",   etaMean*10, selected_station_sp),"",50,0.,1.);
-  TH1D* hSpablePtPi = new TH1D(Form("hSpablePtPi%.0f_%d", etaMean*10, selected_station_sp),"",50,0.,1.);
-  TH1D* hSpablePtPr = new TH1D(Form("hSpablePtPr%.0f_%d", etaMean*10, selected_station_sp),"",50,0.,1.);
-  
-  TH1D* hSpMcEtaPi   = new TH1D(Form("hSpMcEtaPi%.0f_%d",   etaMean*10, selected_station_sp),"",50,1.5,2.0);
-  TH1D* hSpMcEtaPr   = new TH1D(Form("hSpMcEtaPr%.0f_%d",   etaMean*10, selected_station_sp),"",50,1.5,2.0);
-  TH1D* hSpableEtaPi = new TH1D(Form("hSpableEtaPi%.0f_%d", etaMean*10, selected_station_sp),"",50,1.5,2.0);
-  TH1D* hSpableEtaPr = new TH1D(Form("hSpableEtaPr%.0f_%d", etaMean*10, selected_station_sp),"",50,1.5,2.0);
-
-  TH1D* hLayerCountsVsEta = new TH1D("hLayerCounts","",50,1.5,2.0);
   for (int ev=0;ev<nEvents;ev++){ // events
     tPart->GetEntry(ev);
-    for (int ip=0;ip<part_pdg->size();ip++){ // particles
-      if (part_mid->at(ip)>0) continue; // only primaries
-      int pdg = part_pdg->at(ip);
-      float vz = part_vz->at(ip);
-      float pt = part_pt->at(ip);
-      float eta = part_eta->at(ip);
-      float phi = part_phi->at(ip);
+    for (int i=0;i<part_pdg->size();i++){ // particles
+      int ip=i+1; // +1 since particleId is counted from 1
+      if (part_mid->at(i)>0) continue; // only primaries
+      int pdg = part_pdg->at(i);
+      float vz = part_vz->at(i);
+      float pt = part_pt->at(i);
+      float eta = part_eta->at(i);
+      float phi = part_phi->at(i);
       if (abs(eta-etaMean)>etaDif || abs(vz)>1.) continue;
       if (abs(pdg)== 211) hSpMcPtPi->Fill(pt);
       if (abs(pdg)==2212) hSpMcPtPr->Fill(pt);
       if (abs(pdg)== 211) hSpMcEtaPi->Fill(eta);
       if (abs(pdg)==2212) hSpMcEtaPr->Fill(eta);
-      auto& ftdLayerMask = vFtdLayerMask[part_event_id][ip+1];  // +1 since particleId is counted from 1
+      auto& ftdLayerMask = vFtdLayerMask[part_event_id][ip];
       if (!isGoodSP(ftdLayerMask, selected_station_sp)) continue;
       if (abs(pdg)== 211) hSpablePtPi->Fill(pt);
       if (abs(pdg)==2212) hSpablePtPr->Fill(pt);
       if (abs(pdg)== 211) hSpableEtaPi->Fill(eta);
       if (abs(pdg)==2212) hSpableEtaPr->Fill(eta);
-      if (vSpoints[part_event_id][ip+1]==0) continue; // +1 since particleId is counted from 1
+      if (vSpoints[part_event_id][ip]==0) continue;
       if (abs(pdg)== 211) hSpRcPtPi->Fill(pt);
       if (abs(pdg)==2212) hSpRcPtPr->Fill(pt);
     }
