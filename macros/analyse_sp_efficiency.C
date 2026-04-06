@@ -41,6 +41,7 @@ bool isGoodSP(int64_t layerMask, int st){
 
 void analyse_sp_efficiency(
   std::string inputDir = "../build/test/",
+//  std::string inputDir = "../build/nodup1/",
   double etaMean = 1.75, double etaDif = 0.2,
   int selected_station_sp = 0)
 {
@@ -76,6 +77,14 @@ void analyse_sp_efficiency(
   tPart->SetBranchAddress("number_of_hits",&part_mid); // mother id
 
   int nEvents = tPart->GetEntries();
+  std::vector<std::vector<int>> vSpoints(nEvents);
+  std::vector<std::vector<int64_t>> vFtdLayerMask(nEvents);
+  for (int ev=0;ev<nEvents;ev++){ // events
+    tPart->GetEntry(ev);
+    int nParts = part_pdg->size();
+    vSpoints[ev].resize(nParts+1,0);
+    vFtdLayerMask[ev].resize(nParts+1,0);
+  }
 
   // setup measurements
   TFile* fMeas = new TFile(Form("%s/measurements.root", inputDir.c_str()));
@@ -89,9 +98,6 @@ void analyse_sp_efficiency(
   tMeas->SetBranchAddress("volume_id",&meas_volume_id);
   tMeas->SetBranchAddress("layer_id",&meas_layer_id);
 
-  std::vector<std::vector<std::vector<uint32_t>>> vMeasParticleIds(nEvents);
-  std::vector<std::map<int,int64_t>> vEventParticleFtdLayerMask(nEvents);
-  printf("fill measurement particle ids + map fired layers per particle\n");
   int previous_event = -1;
   for (int im=0; im<tMeas->GetEntries(); im++){
     tMeas->GetEntry(im);
@@ -99,20 +105,10 @@ void analyse_sp_efficiency(
       if (meas_event_id%100==0) printf("Event=%d\n", meas_event_id);
       previous_event = meas_event_id;
     }
-    vMeasParticleIds[meas_event_id].push_back(vector<uint32_t>(meas_particles.size()));
-    auto& mapParticleFtdLayerMask = vEventParticleFtdLayerMask[meas_event_id];
     for (int i=0;i<meas_particles.size();i++){
-      int ip = meas_particles[i][2]-1;
-      vMeasParticleIds[meas_event_id].back()[i] = ip;
-      if (auto m = mapParticleFtdLayerMask.find(ip); m == mapParticleFtdLayerMask.end()) mapParticleFtdLayerMask[ip] = 0;
-      mapParticleFtdLayerMask[ip] |= (1ull << (meas_layer_id-shift));
+      int partId = meas_particles[i][2]; // counted from 1
+      vFtdLayerMask[meas_event_id][partId] |= (1ull << (meas_layer_id - shift));
     }
-  }
-
-  std::vector<std::vector<int>> mSpoints(nEvents);
-  for (int ev=0;ev<nEvents;ev++){ // events
-    tPart->GetEntry(ev);
-    mSpoints[ev].resize(part_pdg->size()+1,0);
   }
 
   TFile* fSpacepoints = new TFile(Form("%s/spacepoints.root", inputDir.c_str()));
@@ -153,7 +149,7 @@ void analyse_sp_efficiency(
     float majFrac = (majority - majorityId) * 10.;
     // printf("majorityId=%d majFrac=%f\n", majorityId, majFrac);
     if (majFrac > 0.5) {
-      mSpoints[sevent_id][majorityId] += 1;
+      vSpoints[sevent_id][majorityId] += 1;
     }
   }
 
@@ -166,18 +162,17 @@ void analyse_sp_efficiency(
     tPart->GetEntry(ev);
     for (int ip=0;ip<part_pdg->size();ip++){ // particles
       if (part_mid->at(ip)>0) continue; // only primaries
-      auto& mapParticleFtdLayerMask = vEventParticleFtdLayerMask[ev];
-      int64_t ftdLayerMask = mapParticleFtdLayerMask[ip];
       int pdg = part_pdg->at(ip);
       float vz = part_vz->at(ip);
       float pt = part_pt->at(ip);
       float eta = part_eta->at(ip);
       float phi = part_phi->at(ip);
       if (abs(eta-etaMean)>etaDif || abs(vz)>1.) continue;
+      auto& ftdLayerMask = vFtdLayerMask[ev][ip+1];  // +1 since particleId is counted from 1
       if (!isGoodSP(ftdLayerMask, selected_station_sp)) continue;
       if (abs(pdg)== 211) hSpablePtPi->Fill(pt);
       if (abs(pdg)==2212) hSpablePtPr->Fill(pt);
-      if (mSpoints[ev][ip+1]==0) continue; // +1 since particleId is counted from 1
+      if (vSpoints[ev][ip+1]==0) continue; // +1 since particleId is counted from 1
       if (abs(pdg)== 211) hSpRcPtPi->Fill(pt);
       if (abs(pdg)==2212) hSpRcPtPr->Fill(pt);
     }
