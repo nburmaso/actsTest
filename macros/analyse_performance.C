@@ -1,3 +1,6 @@
+R__ADD_INCLUDE_PATH(/home/ekryshen/mpd/actsTest/build/stage/include)
+R__ADD_LIBRARY_PATH(/home/ekryshen/mpd/actsTest/build/stage/lib)
+R__LOAD_LIBRARY(libactsTestLib.so)
 #include "TFile.h"
 #include "TTree.h"
 #include "TClonesArray.h"
@@ -7,25 +10,46 @@
 #include "TCanvas.h"
 #include "ActsFatras/EventData/Barcode.hpp"
 #include "tree_summary.C"
+#include "MyFtdGeo.h"
+#include "MyFtdDetector.h"
+
 
 const int nStations = 5;
 const int nLayersPerStation = 9;
 const int shift = 2;
+const int minMeasPerCand = 3;
+MyFtdGeo* ftdGeo = nullptr;
 
 bool isGoodFtd(int64_t layerMask, int minHits = 5){
   vector<int> nHits(nStations,0); // number of hits per station
+  vector<int> nType5(nStations,0); // number of type5 hits per station
+  vector<int> nType6(nStations,0); // number of type6 hits per station
   for (int st=0;st<nStations;st++){
     for (int l=0;l<nLayersPerStation;l++) {
-      if (l==nLayersPerStation/2) continue;
-      nHits[st] += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
+      int layerIndex = nLayersPerStation*st+l;
+      int type = ftdGeo->GetLayerType(layerIndex);
+      if (type==2) continue;
+      nHits[st] += TESTBIT(layerMask,layerIndex);
+      if (type==5) nType5[st] += TESTBIT(layerMask,layerIndex);
+      if (type==6) nType6[st] += TESTBIT(layerMask,layerIndex);
     }
   }
   // printf("%d %d %d %d %d\n",nHits[0],nHits[1],nHits[2],nHits[3],nHits[4]);
-  if (nHits[0]<3) return 0;
-  if (nHits[1]<3) return 0;
-  if (nHits[2]<3) return 0;
-  if (nHits[3]<3) return 0;
-  if (nHits[4]<3) return 0;
+  if (nHits[0]<minMeasPerCand) return 0;
+  if (nHits[1]<minMeasPerCand) return 0;
+  if (nHits[2]<minMeasPerCand) return 0;
+  if (nHits[3]<minMeasPerCand) return 0;
+  if (nHits[4]<minMeasPerCand) return 0;
+  if (nType5[0]==0) return 0;
+  if (nType5[1]==0) return 0;
+  if (nType5[2]==0) return 0;
+  if (nType5[3]==0) return 0;
+  if (nType5[4]==0) return 0;
+  if (nType6[0]==0) return 0;
+  if (nType6[1]==0) return 0;
+  if (nType6[2]==0) return 0;
+  if (nType6[3]==0) return 0;
+  if (nType6[4]==0) return 0;
   return 1;
 }
 
@@ -33,9 +57,10 @@ bool isGoodRecoFtd(int64_t layerMask, int minHits = 5){
   vector<int> nHits(nStations,0); // number of hits per station
   for (int st=0;st<nStations;st++){
     for (int l=0;l<nLayersPerStation;l++) {
-      if (l==nLayersPerStation/2) continue;
-      nHits[st] += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
-    }
+      int layerIndex = nLayersPerStation*st+l;
+      int type = ftdGeo->GetLayerType(layerIndex);
+      if (type==2) continue;
+      nHits[st] += TESTBIT(layerMask,layerIndex);    }
   }
   if (nHits[0]+nHits[1]+nHits[2]+nHits[3]+nHits[4]<minHits) return 0;
   if (nHits[0]<1) return 0;
@@ -47,21 +72,35 @@ bool isGoodRecoFtd(int64_t layerMask, int minHits = 5){
 }
 
 bool isGoodSeed(int64_t layerMask, int minHits = 5){
-  vector<int> nSeeds(nStations,0); // number of hits per station
+  vector<int> nHits(nStations,0); // number of hits per station
+  vector<int> nType5(nStations,0); // number of type5 hits per station
+  vector<int> nType6(nStations,0); // number of type6 hits per station
   for (int st=0;st<nStations;st++){
     for (int l=0;l<nLayersPerStation;l++) {
-      if (l==nLayersPerStation/2) continue;
-      nSeeds[st] += ((layerMask & (1ull << (nLayersPerStation*st+l))) > 0);
+      int layerIndex = nLayersPerStation*st+l;
+      int type = ftdGeo->GetLayerType(layerIndex);
+      if (type==2) continue;
+      nHits[st] += TESTBIT(layerMask,layerIndex);
+      if (type==5) nType5[st] += TESTBIT(layerMask,layerIndex);
+      if (type==6) nType6[st] += TESTBIT(layerMask,layerIndex);
     }
   }
-  if (nSeeds[0]<3) return 0;
-  if (nSeeds[2]<3) return 0;
-  if (nSeeds[4]<3) return 0;
+  if (nHits[0]<minMeasPerCand) return 0;
+  if (nHits[2]<minMeasPerCand) return 0;
+  if (nHits[4]<minMeasPerCand) return 0;
+  if (nType5[0]==0) return 0;
+  if (nType5[2]==0) return 0;
+  if (nType5[4]==0) return 0;
+  if (nType6[0]==0) return 0;
+  if (nType6[2]==0) return 0;
+  if (nType6[4]==0) return 0;
   return 1;
 }
 
-void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
+
+void analyse_performance(TString dir = "../build/dup90/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
 // gStyle->SetOptStat(0);
+  ftdGeo = new MyFtdGeo();
   #define axisPt 100,0.,1.
   #define axisPhi 90,-M_PI,M_PI
   #define axisEta 50,1.5,2.0
@@ -119,7 +158,9 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
   vector<vector<int>> vMatched(nEvents);
   vector<vector<int>> vNumberOfMatched(nEvents);
   vector<vector<int>> vSeeds(nEvents);
-
+  vector<vector<int>> vSpoints0(nEvents);
+  vector<vector<int>> vSpoints2(nEvents);
+  vector<vector<int>> vSpoints4(nEvents);
   for (int ev=0;ev<nEvents;ev++){ // unordered events (note: ev is not thread safe)
     tPart->GetEntry(ev);
     int nParts = part_pdg->size();
@@ -127,6 +168,9 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
     vFtdLayerMask[part_event_id].resize(nParts+1,0);
     vNumberOfMatched[part_event_id].resize(nParts+1,0);
     vMatched[part_event_id].resize(nParts+1,0);
+    vSpoints0[part_event_id].resize(nParts+1,0);    
+    vSpoints2[part_event_id].resize(nParts+1,0);    
+    vSpoints4[part_event_id].resize(nParts+1,0);    
     vSeeds[part_event_id].resize(nParts+1,0);
   }
 
@@ -146,7 +190,7 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
       if (vMatched[m_eventNr][ip]<2) vMatched[m_eventNr][ip]=2;
       auto& layers = m_measurementLayer->at(it);
       int64_t trackFtdLayerMask = 0;
-      for (int il=0;il<layers.size();il++) trackFtdLayerMask |= (1ull << (layers[il]-shift));
+      for (int il=0;il<layers.size();il++) SETBIT(trackFtdLayerMask, (layers[il]-shift));
       for (int il=0;il<layers.size();il++) hLayers->Fill(layers[il]);
       if (trackable && !isGoodRecoFtd(trackFtdLayerMask)) continue;
       if (vMatched[m_eventNr][ip]<3) vMatched[m_eventNr][ip]=3;
@@ -180,7 +224,51 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
     for (int i=0;i<meas_particles.size();i++){
       int ip = meas_particles[i][2]; // counted from 1
       vMeasParticleIds[meas_event_id].back()[i] = ip;
-      vFtdLayerMask[meas_event_id][ip] |= (1ull << (meas_layer_id - shift));
+      SETBIT(vFtdLayerMask[meas_event_id][ip], (meas_layer_id - shift));
+    }
+  }
+
+  TFile* fSpacepoints = new TFile(dir + "spacepoints.root");
+  TTree* tSpacepoints = (TTree*) fSpacepoints->Get("spacepoints");
+  tSpacepoints->Print();
+  float sx;
+  float sy;
+  float sz;
+  float st;  
+  float varxx;
+  float varxy;
+  float varyy;
+  float smajority;
+  UInt_t sevent_id;
+  ULong64_t sgeometry_id;
+  ULong64_t smeas_id, smeas_id_2;
+  tSpacepoints->SetBranchAddress("x",&sx);
+  tSpacepoints->SetBranchAddress("y",&sy);
+  tSpacepoints->SetBranchAddress("z",&sz);
+  tSpacepoints->SetBranchAddress("t",&smajority);
+  tSpacepoints->SetBranchAddress("var_r",&varxx);  
+  tSpacepoints->SetBranchAddress("var_z",&varyy);  
+  tSpacepoints->SetBranchAddress("geometry_id",&sgeometry_id);
+  tSpacepoints->SetBranchAddress("event_id",&sevent_id);
+  tSpacepoints->SetBranchAddress("measurement_id", &smeas_id);
+  tSpacepoints->SetBranchAddress("measurement_id_2", &smeas_id_2);
+
+  int previous_sevent_id = -1;
+  for (int is=0;is<tSpacepoints->GetEntries();is++){
+    tSpacepoints->GetEntry(is);
+    if (previous_sevent_id!=sevent_id){
+      previous_sevent_id = sevent_id;
+      if (sevent_id%100==0) printf("%d\n",sevent_id);
+    }
+    int layerIndex = Acts::GeometryIdentifier(sgeometry_id).layer() - shift;
+    int station = ftdGeo->GetLayerStation(layerIndex);
+    int majorityId = trunc(smajority);
+    float majFrac = (smajority - majorityId) * 10.;
+    // printf("majorityId=%d majFrac=%f\n", majorityId, majFrac);
+    if (majFrac > 0.5) {
+      if (station==0) vSpoints0[sevent_id][majorityId] += 1;
+      if (station==2) vSpoints2[sevent_id][majorityId] += 1;
+      if (station==4) vSpoints4[sevent_id][majorityId] += 1;
     }
   }
 
@@ -230,6 +318,9 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
       float phi = part_phi->at(i);    
       if (abs(eta-etaMean)>etaDif || abs(vz)>1.) continue;
       // TODO write seedable selection based on availability of spacepoints
+      if (vSpoints0[part_event_id][ip]==0) continue;
+      if (vSpoints2[part_event_id][ip]==0) continue;
+      if (vSpoints4[part_event_id][ip]==0) continue;
       if (abs(pdg)== 211) hSeedablePtPi->Fill(pt);
       if (abs(pdg)==2212) hSeedablePtPr->Fill(pt);
       if (abs(pdg)== 211) hSeedablePhiPi->Fill(phi);

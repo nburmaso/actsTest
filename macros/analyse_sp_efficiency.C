@@ -28,7 +28,7 @@ bool isGoodSP(int64_t layerMask, int st){
     int layerIndex = nLayersPerStation*st+l;
     int type = ftdGeo->GetLayerType(layerIndex);
     if (type == kPixel) continue;
-    bool isHit = ((layerMask & (1ull << layerIndex)) > 0);
+    bool isHit = TESTBIT(layerMask, layerIndex);
     if (!isHit) continue;
     if (type == 5) type5++;
     if (type == 6) type6++;
@@ -41,7 +41,7 @@ bool isGoodSP(int64_t layerMask, int st){
 }
 
 void analyse_sp_efficiency(
-  std::string inputDir = "../build/test/",
+  std::string inputDir = "../build/dup90/",
   double etaMean = 1.75, double etaDif = 0.2,
   int selected_station_sp = 0)
 {
@@ -126,8 +126,8 @@ void analyse_sp_efficiency(
       previous_event = meas_event_id;
     }
     for (int i=0;i<meas_particles.size();i++){
-      int partId = meas_particles[i][2]; // counted from 1
-      vFtdLayerMask[meas_event_id][partId] |= (1ull << (meas_layer_id - shift));
+      int ip = meas_particles[i][2]; // counted from 1
+      SETBIT(vFtdLayerMask[meas_event_id][ip], (meas_layer_id - shift));
     }
   }
 
