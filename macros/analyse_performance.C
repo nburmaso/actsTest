@@ -110,8 +110,8 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5){
   return 1;
 }
 
-void analyse_performance(TString dir = "../build/ruvdup90/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
-
+void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
+//void analyse_performance(TString dir = "../build/ruv90/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
 //void analyse_performance(TString dir = "../build/ruvdup90/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
 // gStyle->SetOptStat(0);
   ftdGeo = new MyFtdGeo();
@@ -181,6 +181,7 @@ void analyse_performance(TString dir = "../build/ruvdup90/", double etaMean = 1.
   for (int ev=0;ev<nEvents;ev++){ // unordered events (note: ev is not thread safe)
     tPart->GetEntry(ev);
     int nParts = part_pdg->size();
+    printf("nParts=%d\n",nParts);
     // counting particles from 1 => increase allocated vector size by 1
     vFtdLayerMask[part_event_id].resize(nParts+1,0);
     vMatched[part_event_id].resize(nParts+1,0);
@@ -344,7 +345,6 @@ void analyse_performance(TString dir = "../build/ruvdup90/", double etaMean = 1.
       if (vSpoints0[part_event_id][ip]==0) continue;
       if (vSpoints2[part_event_id][ip]==0) continue;
       if (vSpoints4[part_event_id][ip]==0) continue;
-      printf("here\n");
       if (abs(pdg)== 211) hSeedablePtPi->Fill(pt);
       if (abs(pdg)==2212) hSeedablePtPr->Fill(pt);
       if (abs(pdg)== 211) hSeedablePhiPi->Fill(phi);
@@ -373,13 +373,15 @@ void analyse_performance(TString dir = "../build/ruvdup90/", double etaMean = 1.
     }
   }
 
-  double nSeedable = hSeedablePtPi->Integral();
-  double nSeeds = hSeedPtPi->Integral();
-  double nBest = hRcPtPi->Integral();
-  double nRc = hNumberOfMatchedPi->Integral();
-  printf("nSeeds/nSeedable=%f\n",nSeeds/nSeedable);
-  printf("nBest/nSeeds=%f\n",nBest/nSeeds);
-  printf("nRc/nBest=%f\n",nRc/nBest);
+  double binPtMin = hSeedablePtPi->GetXaxis()->FindFixBin(0.2+0.001);
+  double binPtMax = hSeedablePtPi->GetXaxis()->FindFixBin(1.0-0.001);
+  double nSeedable = hSeedablePtPi->Integral(binPtMin,binPtMax);
+  double nSeeds = hSeedPtPi->Integral(binPtMin,binPtMax);
+  double nBest = hRcPtPi->Integral(binPtMin,binPtMax);
+  double nRc = hNumberOfMatchedPi->Integral(binPtMin,binPtMax);
+  printf("nSeeds/nSeedable=%.0f/%.0f=%f\n",nSeeds,nSeedable, nSeeds/nSeedable);
+  printf("nBest/nSeeds=%.0f/%.0f=%f\n",nBest,nSeeds,nBest/nSeeds);
+  printf("nRc/nBest=%.0f/%.0f=%f\n",nRc,nBest,nRc/nBest);
 
   new TCanvas;
   hLayers->Draw();

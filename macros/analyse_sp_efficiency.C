@@ -12,7 +12,7 @@ R__LOAD_LIBRARY(libactsTestLib.so)
 const int nStations = 5;
 const int nLayersPerStation = 10;
 const int shift = 2;
-const int minMeasPerCand = 4;
+const int minMeasPerCand = 3;
 
 int kPixel = 2;
 
@@ -45,12 +45,13 @@ bool isGoodSP(int64_t layerMask, int st){
 
 void analyse_sp_efficiency(
   std::string inputDir = "../build/test/",
+//  std::string inputDir = "../build/ruvdup90/",
   double etaMean = 1.75, double etaDif = 0.2,
   int selected_station_sp = 0)
 {
   // gStyle->SetOptStat(0);
 
-  #define axisPt 100,0.,1.
+  #define axisPt 20,0.,1.
   #define axisPhi 90,-M_PI,M_PI
   #define axisEta 50,1.5,2.0
 
@@ -203,9 +204,11 @@ void analyse_sp_efficiency(
     }
   }
 
-  float mc = hSpMcPtPi->Integral();
-  float rc = hSpRcPtPi->Integral();
-  float spable = hSpablePtPi->Integral();
+  double binPtMin = hSpMcPtPi->GetXaxis()->FindFixBin(0.2+0.001);
+  double binPtMax = hSpMcPtPi->GetXaxis()->FindFixBin(1.0-0.001);
+  float mc = hSpMcPtPi->Integral(binPtMin,binPtMax);
+  float rc = hSpRcPtPi->Integral(binPtMin,binPtMax);
+  float spable = hSpablePtPi->Integral(binPtMin,binPtMax);
   printf("spable/mc=%.0f/%.0f=%.4f\n",spable, mc, spable/mc);
   printf("rc/spable = %.0f/%.0f=%.4f\n",rc, spable, rc/spable);
 

@@ -21,7 +21,7 @@ const int nLayersPerStation = 10;
 const int shift = 2; //  isroc = 1;  isframe = 1; without fake pre-layer
 
 // set layer corresponding to fake surface in the middle of the station
-void draw_straw_station(int selected_event = 0, int station = 0, bool draw_spacepoints = 1, bool zoom = 0){
+void draw_straw_station(int selected_event = 1, int station = 0, bool draw_spacepoints = 1, bool zoom = 0){
   int layerMin = station*nLayersPerStation;
   int layerMax = (station+1)*nLayersPerStation-1;
 
@@ -147,6 +147,8 @@ void draw_straw_station(int selected_event = 0, int station = 0, bool draw_space
     if (selected_event>=0 && event_id!=selected_event) continue;
     auto geoId = Acts::GeometryIdentifier(geometry_id);
     int layer = geoId.layer()-shift;      
+    int layerType = fg.GetLayerType(layer);
+    if (layerType == 2) continue;
     if (layer>layerMax) continue;
     if (layer<layerMin) continue;
     g->AddPoint(tx/10,ty/10);
