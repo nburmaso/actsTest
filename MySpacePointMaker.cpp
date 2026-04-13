@@ -382,6 +382,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       double chi2ndf = nlinks > 3 ? chi2par / (nlinks - 3) : chi2par;
       ACTS_VERBOSE("par:  nlinks=" << nlinks << " tx=" << tx <<" ty=" << ty << " chi2/ndf=" << chi2ndf);
       if (chi2ndf > m_cfg.maxChi2) continue;
+      if (fabs(k)>0.0002) continue;
       auto& refSelCand = selectedUnfiltCandidates.emplace_back(Candidate({preCandidate.sourceLinks, iStation, {}, chi2par, chi2ndf, tx, ty, k}));
       // uncomment to debug precandidates
       // printf("station %d: chi2/ndf=%e particles: ", refSelCand.station, refSelCand.chi2ndf);
@@ -518,9 +519,9 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
       ACTS_VERBOSE("SP: k=" << sp.k << " x=" << x << " y=" << y << " z=" << z << " var_xy=" << varxy*z*z);
       boost::container::static_vector<Acts::SourceLink, 2> slinks = {slink1, slink2};
       Acts::Vector3 pos{x, y, z};
-      double var_r = (x*x*varxx + y*y*varyy + 2*x*y*varxy)/(x*x+y*y);
+      double var_r = (x*x*varxx + y*y*varyy + 2*x*y*varxy)/(x*x+y*y)*z*z;
       double var_z = 0.1;
-      if (var_r>1e-5) continue;
+      if (var_r>1.) continue;
       //std::back_inserter(spacePoints) = SimSpacePoint(pos, sp.chi2ndf*Acts::UnitConstants::ns, var_r, var_z, 0, slinks);
       std::back_inserter(spacePoints) = SimSpacePoint(pos, majorityCode*Acts::UnitConstants::ns, var_r, var_z, 0, slinks);
       // std::back_inserter(spacePoints) = SimSpacePoint(pos, sp.varxy*sp.z*sp.z*Acts::UnitConstants::ns, sp.varxx*sp.z*sp.z, sp.varyy*sp.z*sp.z, 0, slinks);
