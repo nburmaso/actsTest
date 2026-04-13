@@ -12,7 +12,7 @@ R__LOAD_LIBRARY(libactsTestLib.so)
 const int nStations = 5;
 const int nLayersPerStation = 10;
 const int shift = 2;
-const int minMeasPerCand = 3;
+const int minMeasPerCand = 4;
 
 int kPixel = 2;
 
@@ -22,6 +22,7 @@ std::shared_ptr<MyFtdGeo> ftdGeo = nullptr;
 
 bool isGoodSP(int64_t layerMask, int st){
   int nHits = 0; // number of hits per station
+  int type4 = 0;
   int type5 = 0;
   int type6 = 0;
   for (int l=0;l<nLayersPerStation;l++) {
@@ -30,18 +31,20 @@ bool isGoodSP(int64_t layerMask, int st){
     if (type == kPixel) continue;
     bool isHit = TESTBIT(layerMask, layerIndex);
     if (!isHit) continue;
+    if (type == 4) type4++;
     if (type == 5) type5++;
     if (type == 6) type6++;
     nHits++;
   }
-  if (type5 <1) return 0;
-  if (type6 <1) return 0;
+  if (type4 == 0) return 0;
+  if (type5 == 0) return 0;
+  if (type6 == 0) return 0;
   if (nHits<minMeasPerCand) return 0;
   return 1;
 }
 
 void analyse_sp_efficiency(
-  std::string inputDir = "../build/ruvdup90/",
+  std::string inputDir = "../build/test/",
   double etaMean = 1.75, double etaDif = 0.2,
   int selected_station_sp = 0)
 {
