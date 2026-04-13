@@ -21,7 +21,7 @@ const int shift = 2; //  isroc = 1;  isframe = 1; without fake pre-layer
 
 // set layer corresponding to fake surface in the middle of the station
 void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool draw_spacepoints = 1, bool zoom = 0){
-  TString dir = "../build/test";
+  TString dir = "../build/dup90";
   dir.Append("/");
 
   MyFtdGeo fg;
@@ -161,7 +161,7 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
   float sz;
   UInt_t sevent_id;
   ULong64_t sgeometry_id;
-
+  float majorityCode;
   TFile* fSpacepoints = new TFile(dir + "spacepoints.root");
   TTree* tSpacepoints = (TTree*) fSpacepoints->Get("spacepoints");
 
@@ -170,19 +170,28 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
   tSpacepoints->SetBranchAddress("z",&sz);
   tSpacepoints->SetBranchAddress("geometry_id",&sgeometry_id);
   tSpacepoints->SetBranchAddress("event_id",&sevent_id);
+  tSpacepoints->SetBranchAddress("t",&majorityCode);
 
   TGraph* gSP = new TGraph();
+  TGraph* gSPgood = new TGraph();
   for (int is=0;is<tSpacepoints->GetEntries();is++){
       tSpacepoints->GetEntry(is);
       if (selected_event>=0 && sevent_id!=selected_event) continue;
       auto geoId = Acts::GeometryIdentifier(sgeometry_id);
       int layer = geoId.layer()-shift;      
       if (fabs(layer-selected_layer)>nLayersPerStation/2) continue;
+      float majFrac = (majorityCode - trunc(majorityCode))*10;
       gSP->AddPoint(sx/10.,sy/10.);
+      if (majFrac<0.8) continue;
+      gSPgood->AddPoint(sx/10.,sy/10.);
   }
-  gSP->SetMarkerColor(kMagenta);
-  gSP->SetMarkerStyle(kFullCircle);
-  gSP->SetMarkerSize(0.7);
-  gSP->Draw("p");
 
+  gSP->SetMarkerColor(kMagenta);
+  gSPgood->SetMarkerColor(kYellow);
+  gSP->SetMarkerStyle(kFullCircle);
+  gSPgood->SetMarkerStyle(kFullCircle);
+  gSP->SetMarkerSize(0.9);
+  gSPgood->SetMarkerSize(0.5);
+  gSP->Draw("p");
+  gSPgood->Draw("p");
 }

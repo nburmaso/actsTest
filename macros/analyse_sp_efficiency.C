@@ -10,7 +10,7 @@ R__LOAD_LIBRARY(libactsTestLib.so)
 #include "MyFtdDetector.h"
 
 const int nStations = 5;
-const int nLayersPerStation = 9;
+const int nLayersPerStation = 10;
 const int shift = 2;
 const int minMeasPerCand = 3;
 
@@ -34,14 +34,14 @@ bool isGoodSP(int64_t layerMask, int st){
     if (type == 6) type6++;
     nHits++;
   }
-  if (type5 == 0) return 0;
-  if (type6 == 0) return 0;
+  if (type5 <1) return 0;
+  if (type6 <1) return 0;
   if (nHits<minMeasPerCand) return 0;
   return 1;
 }
 
 void analyse_sp_efficiency(
-  std::string inputDir = "../build/dup90/",
+  std::string inputDir = "../build/ruvdup90/",
   double etaMean = 1.75, double etaDif = 0.2,
   int selected_station_sp = 0)
 {
@@ -168,7 +168,7 @@ void analyse_sp_efficiency(
     int majorityId = trunc(smajority);
     float majFrac = (smajority - majorityId) * 10.;
     // printf("majorityId=%d majFrac=%f\n", majorityId, majFrac);
-    if (majFrac > 0.5) {
+    if (majFrac > 0.74) {
       vSpoints[sevent_id][majorityId] += 1;
     }
   }

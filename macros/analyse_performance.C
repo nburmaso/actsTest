@@ -15,9 +15,10 @@ R__LOAD_LIBRARY(libactsTestLib.so)
 
 
 const int nStations = 5;
-const int nLayersPerStation = 9;
+const int nLayersPerStation = 10;
 const int shift = 2;
 const int minMeasPerCand = 3;
+const float minMajFrac = 0.74;
 MyFtdGeo* ftdGeo = nullptr;
 
 bool isGoodFtd(int64_t layerMask, int minHits = 5){
@@ -98,12 +99,14 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5){
 }
 
 
-void analyse_performance(TString dir = "../build/dup90/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
+void analyse_performance(TString dir = "../build/ruvdup90/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
 // gStyle->SetOptStat(0);
   ftdGeo = new MyFtdGeo();
-  #define axisPt 100,0.,1.
+  #define axisPt 20,0.,1.
   #define axisPhi 90,-M_PI,M_PI
   #define axisEta 50,1.5,2.0
+  TH2D* hPtResVsPtPi = new TH2D("hPtResVsPtPi","",axisPt,2000,-1.,1.);  
+  TH2D* hPtResVsPtPr = new TH2D("hPtResVsPtPr","",axisPt,2000,-1.,1.);  
   TH1D* hSeedPtPi = new TH1D("hSeedPtPi","",axisPt);
   TH1D* hSeedPtPr = new TH1D("hSeedPtPr","",axisPt);
   TH1D* hSeedPhiPi = new TH1D("hSeedPhiPi","",axisPhi);
@@ -122,7 +125,7 @@ void analyse_performance(TString dir = "../build/dup90/", double etaMean = 1.75,
   TH1D* hRcPhiPr = new TH1D("hRcPhiPr","",axisPhi);
   TH1D* hRcEtaPi = new TH1D("hRcEtaPi","",axisEta);
   TH1D* hRcEtaPr = new TH1D("hRcEtaPr","",axisEta);
-  TH1D* hNumberOfMatchedPi = new TH1D("hNumberOfMatchedPi","",100,0.,1.);
+  TH1D* hNumberOfMatchedPi = new TH1D("hNumberOfMatchedPi","",axisPt);
   TH1D* hLayers = new TH1D("hLayers","",40,0,40);
   TH1D* hNLayers = new TH1D("hNLayers","layers",40,0,40);
 
@@ -161,17 +164,20 @@ void analyse_performance(TString dir = "../build/dup90/", double etaMean = 1.75,
   vector<vector<int>> vSpoints0(nEvents);
   vector<vector<int>> vSpoints2(nEvents);
   vector<vector<int>> vSpoints4(nEvents);
+  vector<vector<TVector3>> vRcVecP(nEvents);  
   for (int ev=0;ev<nEvents;ev++){ // unordered events (note: ev is not thread safe)
     tPart->GetEntry(ev);
     int nParts = part_pdg->size();
     // counting particles from 1 => increase allocated vector size by 1
     vFtdLayerMask[part_event_id].resize(nParts+1,0);
-    vNumberOfMatched[part_event_id].resize(nParts+1,0);
+    vMatched[part_event_id].resize(nParts+1,0);
     vMatched[part_event_id].resize(nParts+1,0);
     vSpoints0[part_event_id].resize(nParts+1,0);    
     vSpoints2[part_event_id].resize(nParts+1,0);    
     vSpoints4[part_event_id].resize(nParts+1,0);    
     vSeeds[part_event_id].resize(nParts+1,0);
+    vNumberOfMatched[part_event_id].resize(nParts+1,0);
+    vRcVecP[part_event_id].resize(nParts+1);
   }
 
   printf("fill match array\n");
@@ -195,6 +201,10 @@ void analyse_performance(TString dir = "../build/dup90/", double etaMean = 1.75,
       if (trackable && !isGoodRecoFtd(trackFtdLayerMask)) continue;
       if (vMatched[m_eventNr][ip]<3) vMatched[m_eventNr][ip]=3;
       vNumberOfMatched[m_eventNr][ip]++;
+      double qp = m_eQOP_fit->at(it);
+      double theta = m_eTHETA_fit->at(it);
+      double phi = m_ePHI_fit->at(it);
+      vRcVecP[m_eventNr][ip].SetMagThetaPhi(fabs(1./qp), theta, phi);
       hNLayers->Fill(layers.size());
     }
   }
@@ -264,8 +274,8 @@ void analyse_performance(TString dir = "../build/dup90/", double etaMean = 1.75,
     int station = ftdGeo->GetLayerStation(layerIndex);
     int majorityId = trunc(smajority);
     float majFrac = (smajority - majorityId) * 10.;
-    // printf("majorityId=%d majFrac=%f\n", majorityId, majFrac);
-    if (majFrac > 0.5) {
+    printf("majorityId=%d majFrac=%f\n", majorityId, majFrac);
+    if (majFrac > minMajFrac) {
       if (station==0) vSpoints0[sevent_id][majorityId] += 1;
       if (station==2) vSpoints2[sevent_id][majorityId] += 1;
       if (station==4) vSpoints4[sevent_id][majorityId] += 1;
@@ -321,6 +331,7 @@ void analyse_performance(TString dir = "../build/dup90/", double etaMean = 1.75,
       if (vSpoints0[part_event_id][ip]==0) continue;
       if (vSpoints2[part_event_id][ip]==0) continue;
       if (vSpoints4[part_event_id][ip]==0) continue;
+      printf("here\n");
       if (abs(pdg)== 211) hSeedablePtPi->Fill(pt);
       if (abs(pdg)==2212) hSeedablePtPr->Fill(pt);
       if (abs(pdg)== 211) hSeedablePhiPi->Fill(phi);
@@ -343,6 +354,9 @@ void analyse_performance(TString dir = "../build/dup90/", double etaMean = 1.75,
       if (abs(pdg)== 211) hRcEtaPi->Fill(eta);
       if (abs(pdg)==2212) hRcEtaPr->Fill(eta);
       if (abs(pdg)== 211) hNumberOfMatchedPi->Fill(pt,vNumberOfMatched[part_event_id][ip]);
+      double ptRC = vRcVecP[part_event_id][ip].Perp();
+      if (abs(pdg)== 211) hPtResVsPtPi->Fill(pt,(ptRC-pt)/pt);
+      if (abs(pdg)==2212) hPtResVsPtPr->Fill(pt,(ptRC-pt)/pt);
     }
   }
 
@@ -396,13 +410,31 @@ void analyse_performance(TString dir = "../build/dup90/", double etaMean = 1.75,
   hRcEffEtaPi->Divide(hRcEtaPi, hSeedEtaPi, 1, 1, "B");
   hRcEffEtaPi->Draw();
 
-  auto* fout = new TFile(dir +"tracking_performance.root", "update");
-  hSeedPtPi->Write(hSeedPtPi->GetName(),TObject::kOverwrite);
-  hSeedPtPr->Write(hSeedPtPr->GetName(),TObject::kOverwrite);
-  hSeedablePtPi->Write(hSeedablePtPi->GetName(),TObject::kOverwrite);
-  hSeedablePtPr->Write(hSeedablePtPr->GetName(),TObject::kOverwrite);
-  hRcPtPi->Write(hRcPtPi->GetName(),TObject::kOverwrite);
-  hRcPtPr->Write(hRcPtPr->GetName(),TObject::kOverwrite);
+  auto* fout = new TFile(dir +Form("tracking_performance_%.2f.root",etaMean), "recreate");
+  hSeedPtPi->Write();
+  hSeedPtPr->Write();
+  hSeedPhiPi->Write();
+  hSeedPhiPr->Write();
+  hSeedEtaPi->Write();
+  hSeedEtaPr->Write();
+  hSeedablePtPi->Write();
+  hSeedablePtPr->Write();
+  hSeedablePhiPi->Write();
+  hSeedablePhiPr->Write();
+  hSeedableEtaPi->Write();
+  hSeedableEtaPr->Write();
+  hRcPtPi->Write();
+  hRcPtPr->Write();
+  hRcPhiPi->Write();
+  hRcPhiPr->Write();
+  hRcEtaPi->Write();
+  hRcEtaPr->Write();
+  hNumberOfMatchedPi->Write();
+  hLayers->Write();
+  hNLayers->Write();
+  hPtResVsPtPi->Write();
+  hPtResVsPtPr->Write();
+
   fout->Close();
 
 }
