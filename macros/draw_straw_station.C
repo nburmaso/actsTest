@@ -17,20 +17,25 @@
 #include "../MyFtdGeo.h"
 using namespace std;
 
+const int nLayersPerStation = 10;
 const int shift = 2; //  isroc = 1;  isframe = 1; without fake pre-layer
 
 // set layer corresponding to fake surface in the middle of the station
-void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool draw_spacepoints = 1, bool zoom = 0){
-  TString dir = "../build/dup90";
+void draw_straw_station(int selected_event = 0, int station = 0, bool draw_spacepoints = 1, bool zoom = 0){
+  int layerMin = station*nLayersPerStation;
+  int layerMax = (station+1)*nLayersPerStation-1;
+
+  TString dir = "../build/test";
   dir.Append("/");
 
   MyFtdGeo fg;
   double incl = fg.GetTubeIncl();
-  double rmin = fg.GetLayerRMin(selected_layer);
-  double rmax = fg.GetLayerRMax(selected_layer);
+  double rmin = fg.GetLayerRMin(layerMin);
+  double rmax = fg.GetLayerRMax(layerMin);
   double dr = (rmax-rmin)/2.;
   double rc = (rmin+rmax)/2.;
-  double lz = fg.GetLayerPositions()[selected_layer];
+  double lzMin = fg.GetLayerPositions()[layerMin]-1;
+  double lzMax = fg.GetLayerPositions()[layerMax]+1;  
   const int nLayersPerStation = fg.GetNLayersPerStation();
 
   // new TCanvas("cmeas","cmeas",1320,1320);
@@ -54,10 +59,10 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
   using std::numbers::pi;
 
   std::map<int, TPolyLine*> mapPolyLines[nLayersPerStation];
-  for (int layer=selected_layer-nLayersPerStation/2; layer<=selected_layer+nLayersPerStation/2; layer++){
+  for (int layer=layerMin; layer<=layerMax; layer++){
     int layerType = fg.GetLayerType(layer);
     if (layerType == 2) continue;
-    bool back = layer>selected_layer;
+    bool back = layer > station*nLayersPerStation + nLayersPerStation/2;
     auto color = back ? kOrange : kOrange+7;
     if (layerType == 5) color = back ? kGreen-7 : kGreen+1;
     if (layerType == 6) color = back ? kAzure+6 : kAzure;
@@ -104,7 +109,8 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
     int layer = m_layer_id-shift;
     int layerType = fg.GetLayerType(layer);
     if (layerType == 2) continue;
-    if (fabs(m_true_z/10-lz)>3) continue;
+    if (layer>layerMax) continue;
+    if (layer<layerMin) continue;
     printf("%d %d\n",m_layer_id,m_surface_id);
     auto pline = mapPolyLines[layer%nLayersPerStation][m_surface_id-1];
     pline->SetLineWidth(2);
@@ -136,25 +142,20 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
   tHits->SetBranchAddress("tz",&tz);
   
   TGraph* g = new TGraph();
-  TGraph* gh = new TGraph();  
   for (int ih=0;ih<tHits->GetEntries();ih++){
     tHits->GetEntry(ih);
     if (selected_event>=0 && event_id!=selected_event) continue;
     auto geoId = Acts::GeometryIdentifier(geometry_id);
     int layer = geoId.layer()-shift;      
-    if (fabs(layer-selected_layer)>nLayersPerStation/2) continue;
+    if (layer>layerMax) continue;
+    if (layer<layerMin) continue;
     g->AddPoint(tx/10,ty/10);
-    if (fabs(tz/10-lz)<0.01) gh->AddPoint(tx/10,ty/10);
   }
 
 //  g->SetMarkerColor(color);
   g->SetMarkerStyle(kFullCircle);
   g->SetMarkerSize(1.);
   g->Draw("p");
-  gh->SetMarkerStyle(kFullCircle);
-  gh->SetMarkerSize(1.);
-  gh->SetMarkerColor(kGreen);
-  gh->Draw("p");
 
   float sx;
   float sy;
@@ -173,25 +174,19 @@ void draw_straw_station(int selected_event = 0, int selected_layer = 4, bool dra
   tSpacepoints->SetBranchAddress("t",&majorityCode);
 
   TGraph* gSP = new TGraph();
-  TGraph* gSPgood = new TGraph();
   for (int is=0;is<tSpacepoints->GetEntries();is++){
       tSpacepoints->GetEntry(is);
       if (selected_event>=0 && sevent_id!=selected_event) continue;
       auto geoId = Acts::GeometryIdentifier(sgeometry_id);
       int layer = geoId.layer()-shift;      
-      if (fabs(layer-selected_layer)>nLayersPerStation/2) continue;
+      if (layer>layerMax) continue;
+      if (layer<layerMin) continue;
       float majFrac = (majorityCode - trunc(majorityCode))*10;
       gSP->AddPoint(sx/10.,sy/10.);
-      if (majFrac<0.8) continue;
-      gSPgood->AddPoint(sx/10.,sy/10.);
   }
 
   gSP->SetMarkerColor(kMagenta);
-  gSPgood->SetMarkerColor(kYellow);
   gSP->SetMarkerStyle(kFullCircle);
-  gSPgood->SetMarkerStyle(kFullCircle);
   gSP->SetMarkerSize(0.9);
-  gSPgood->SetMarkerSize(0.5);
   gSP->Draw("p");
-  gSPgood->Draw("p");
 }
