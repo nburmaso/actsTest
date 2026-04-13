@@ -65,6 +65,7 @@ namespace straw_helpers
   static inline int findRefIdxForType(PreCandidate const& cand, int typeKey) {
     if (cand.refTypeA == typeKey) return cand.refIdxA;
     if (cand.refTypeB == typeKey) return cand.refIdxB;
+    if (cand.refTypeC == typeKey) return cand.refIdxC;
     return -1;
   }
 
@@ -72,14 +73,36 @@ namespace straw_helpers
     return getRefByIdx(cand, findRefIdxForType(cand, typeKey));
   }
 
-  static inline int findOtherRefIdx(PreCandidate const& cand, int typeKey) {
+  static inline int findOtherRefIdxA(PreCandidate const& cand, int typeKey) {
     if (cand.refTypeA != -1 && cand.refTypeA != typeKey) return cand.refIdxA;
     if (cand.refTypeB != -1 && cand.refTypeB != typeKey) return cand.refIdxB;
+    if (cand.refTypeC != -1 && cand.refTypeC != typeKey) return cand.refIdxC;
     return -1;
   }
 
-  static inline ISL const* findOtherRef(PreCandidate const& cand, int typeKey) {
-    return getRefByIdx(cand, findOtherRefIdx(cand, typeKey));
+  static inline int findOtherRefIdxB(PreCandidate const& cand, int typeKey) {
+    int found = 0;
+    if (cand.refTypeA != -1 && cand.refTypeA != typeKey) {
+      if (found == 1) return cand.refIdxA;
+      ++found;
+    }
+    if (cand.refTypeB != -1 && cand.refTypeB != typeKey) {
+      if (found == 1) return cand.refIdxB;
+      ++found;
+    }
+    if (cand.refTypeC != -1 && cand.refTypeC != typeKey) {
+      if (found == 1) return cand.refIdxC;
+      ++found;
+    }
+    return -1;
+  }
+
+  static inline ISL const* findOtherRefA(PreCandidate const& cand, int typeKey) {
+    return getRefByIdx(cand, findOtherRefIdxA(cand, typeKey));
+  }
+
+  static inline ISL const* findOtherRefB(PreCandidate const& cand, int typeKey) {
+    return getRefByIdx(cand, findOtherRefIdxB(cand, typeKey));
   }
 
   static inline void setFirstRefForType(PreCandidate& cand, int typeKey, int idx) {
@@ -91,6 +114,10 @@ namespace straw_helpers
       if (cand.refIdxB < 0) cand.refIdxB = idx;
       return;
     }
+    if (cand.refTypeC == typeKey) {
+      if (cand.refIdxC < 0) cand.refIdxC = idx;
+      return;
+    }
     if (cand.refTypeA == -1) {
       cand.refTypeA = typeKey;
       cand.refIdxA = idx;
@@ -99,6 +126,11 @@ namespace straw_helpers
     if (cand.refTypeB == -1) {
       cand.refTypeB = typeKey;
       cand.refIdxB = idx;
+      return;
+    }
+    if (cand.refTypeC == -1) {
+      cand.refTypeC = typeKey;
+      cand.refIdxC = idx;
     }
   }
 
@@ -132,7 +164,8 @@ namespace straw_helpers
       return;
 
     if (layerId >= ctx.nLayers || ctx.ftdGeo->GetLayerStation(layerId) != station) {
-      if (static_cast<int>(cand.sourceLinks.size()) >= ctx.minMeasPerCand && cand.refTypeA != -1 && cand.refTypeB != -1)
+      if (static_cast<int>(cand.sourceLinks.size()) >= ctx.minMeasPerCand &&
+          cand.refTypeA != -1 && cand.refTypeB != -1 && cand.refTypeC != -1)
         cands.emplace_back(cand);
       return;
     }
@@ -147,29 +180,36 @@ namespace straw_helpers
     const int nStraws = ctx.nTubesPerLayer[layerId];
 
     ISL const* sameTypeRef = findRefForType(cand, layTypeKey);
-    ISL const* otherTypeRef = findOtherRef(cand, layTypeKey);
+    ISL const* otherTypeRefA = findOtherRefA(cand, layTypeKey);
+    ISL const* otherTypeRefB = findOtherRefB(cand, layTypeKey);
 
     const int sameRefStrawId = (sameTypeRef != nullptr) ? sameTypeRef->geometryId().sensitive() : -1;
-    const int otherRefStrawId = (otherTypeRef != nullptr) ? otherTypeRef->geometryId().sensitive() : -1;
+    const int otherRefStrawIdA = (otherTypeRefA != nullptr) ? otherTypeRefA->geometryId().sensitive() : -1;
+    const int otherRefStrawIdB = (otherTypeRefB != nullptr) ? otherTypeRefB->geometryId().sensitive() : -1;
 
     for (const ISL& isl : curLayerList) {
       const int strawId = isl.geometryId().sensitive();
       bool ok = true;
       if (sameTypeRef != nullptr) ok = passesAgainstRefStraw(strawId, sameRefStrawId, ctx.maxLoDeltaPStrawId, ctx.maxLoDeltaMStrawId, nStraws);
-      if (ok && otherTypeRef != nullptr) ok = passesAgainstRefStraw(strawId, otherRefStrawId, ctx.maxHiDeltaPStrawId, ctx.maxHiDeltaMStrawId, nStraws);
+      if (ok && otherTypeRefA != nullptr) ok = passesAgainstRefStraw(strawId, otherRefStrawIdA, ctx.maxHiDeltaPStrawId, ctx.maxHiDeltaMStrawId, nStraws);
+      if (ok && otherTypeRefB != nullptr) ok = passesAgainstRefStraw(strawId, otherRefStrawIdB, ctx.maxHiDeltaPStrawId, ctx.maxHiDeltaMStrawId, nStraws);
       if (!ok) continue;
       const int oldRefTypeA = cand.refTypeA;
       const int oldRefTypeB = cand.refTypeB;
+      const int oldRefTypeC = cand.refTypeC;
       const int oldRefIdxA  = cand.refIdxA;
       const int oldRefIdxB  = cand.refIdxB;
+      const int oldRefIdxC  = cand.refIdxC;
       cand.sourceLinks.push_back(isl);
       if (sameTypeRef == nullptr) setFirstRefForType(cand, layTypeKey, static_cast<int>(cand.sourceLinks.size()) - 1);
       constructCands(layerId + 1, station, ctx, cands, cand);
       cand.sourceLinks.pop_back();
       cand.refTypeA = oldRefTypeA;
       cand.refTypeB = oldRefTypeB;
+      cand.refTypeC = oldRefTypeC;
       cand.refIdxA  = oldRefIdxA;
       cand.refIdxB  = oldRefIdxB;
+      cand.refIdxC  = oldRefIdxC;
     }
 
     constructCands(layerId + 1, station, ctx, cands, cand);
@@ -279,7 +319,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
     int station = ftdGeo->GetLayerStation(iL);
     if (station==1 || station==3) continue;
     auto& candList = preCandidates[station];
-    PreCandidate cand;  // starts empty
+    PreCandidate cand{};  // starts empty
     int maxLoDeltaPStrawId, maxHiDeltaPStrawId;
     int maxLoDeltaMStrawId, maxHiDeltaMStrawId;
     if (station == 0) { maxLoDeltaPStrawId = m_cfg.maxLoDeltaPStrawId1; maxHiDeltaPStrawId = m_cfg.maxHiDeltaPStrawId1; }
@@ -369,11 +409,7 @@ ActsExamples::ProcessCode ActsExamples::MySpacePointMaker::execute(const Algorit
         auto& small = it->sourceLinks;
         auto& large = jt->sourceLinks;
         for (std::size_t j = 0; j < large.size() && i < small.size(); ++j) {
-          auto lGId = large[j].geometryId();
-          auto sGId = small[i].geometryId();
-          int largeStraw = lGId.layer() * 10000 + lGId.sensitive();
-          int smallStraw = sGId.layer() * 10000 + sGId.sensitive();
-          if (largeStraw == smallStraw) {
+          if (large[j] == small[i]) {
             ++i;
           }
         }
@@ -629,11 +665,8 @@ std::tuple<double,double,double,double> ActsExamples::MySpacePointMaker::parabol
   double kmax = kk>0 ? kk :  0;
   if (debug) printf("%f %f %f %f\n",kmin, kmax, fk(kmin), fk(kmax));
 
-  const int oldLevel = gErrorIgnoreLevel;
-  gErrorIgnoreLevel = kBreak; // suppress warnings
-
   ROOT::Math::Functor1D functor(fk);
-  ROOT::Math::RootFinder rf(ROOT::Math::RootFinder::kGSL_BISECTION);
+  ROOT::Math::RootFinder rf(ROOT::Math::RootFinder::kBRENT);
   rf.SetFunction(functor, kmin, kmax);
   double k;
   if (rf.Solve()) {
@@ -643,8 +676,6 @@ std::tuple<double,double,double,double> ActsExamples::MySpacePointMaker::parabol
   } else {
     return {1e12,-1,-1,-1};
   }
-
-  gErrorIgnoreLevel = oldLevel;
 
   if (debug) { 
     printf("checking tx=%f ty=%f k=%f\n",tx, ty, k);

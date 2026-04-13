@@ -50,11 +50,13 @@ class MySpacePointMaker final : public IAlgorithm {
   };
 
   struct PreCandidate {
-    std::vector<ActsExamples::IndexSourceLink> sourceLinks;
+    std::vector<IndexSourceLink> sourceLinks;
     int refTypeA = -1;
     int refTypeB = -1;
-    int refIdxA  = -1;
-    int refIdxB  = -1;
+    int refTypeC = -1;
+    int refIdxA = -1;
+    int refIdxB = -1;
+    int refIdxC = -1;
   };
 
   struct Candidate {

@@ -48,7 +48,11 @@ using namespace Acts::UnitConstants;
 using namespace Acts::UnitLiterals;
 
 int main(int argc, char *argv[]){
-  // default parameters
+
+  const int oldLevel = gErrorIgnoreLevel;
+  gErrorIgnoreLevel = kBreak; // suppress warnings
+  ROOT::EnableThreadSafety();
+
   TString inputDir = "none";
   TString outputDir = "test";
   int nThreads = 1;
@@ -470,7 +474,12 @@ int main(int argc, char *argv[]){
   // sequencer.addWriter(std::make_shared<MyTrackWriter>(trackWriterCfg, logLevel));
   // // // sequencer.addWriter(std::make_shared<ActsExamples::RootTrackSummaryWriter>(trackRefitSummaryWriterCfg, logLevel));
 
+  auto t0 = std::chrono::system_clock::now();
   sequencer.run();
+  std::chrono::duration<double> t = std::chrono::system_clock::now() - t0;
+  printf("Elapsed time: %.1f\n", t.count());
+
+  gErrorIgnoreLevel = oldLevel;
 
   return 0;
 }

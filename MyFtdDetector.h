@@ -103,30 +103,21 @@ public:
   }
 
   Acts::GeometryIdentifier FtdLayerToGeoId(int layer) {
-    if (layer == fCacheLay) {
-      return fCacheFtdGeoId;
-    }
     auto it = fFtdLayerToGeoId.find(layer);
     if (it != fFtdLayerToGeoId.end()) {
-      fCacheFtdGeoId = it->second;
-      return fCacheFtdGeoId;
+      return it->second;
     }
     Acts::GeometryIdentifier geoId;
     return geoId.withSensitive(-1);
   }
 
   int GeoIdToFtdLayer(Acts::GeometryIdentifier id) {
-    static Acts::GeometryIdentifier chId{};
-    static int chLayer = -1;
-    if (id == chId) {
-      return chLayer;
-    }
+    int layer = -1;
     auto it = fGeoIdToFtdLayer.find(id);
     if (it != fGeoIdToFtdLayer.end()) {
-      chLayer = it->second;
-      chId = id;
+      layer = it->second;
     }
-    return chLayer;
+    return layer;
   }
 
   std::shared_ptr<std::vector<int>> GetActsLayerToFtdLayer() { return fActsLayerToFtdLayer; }
