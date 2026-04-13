@@ -51,12 +51,13 @@ int main(int argc, char *argv[]){
 
   const int oldLevel = gErrorIgnoreLevel;
   gErrorIgnoreLevel = kBreak; // suppress warnings
-  ROOT::EnableThreadSafety();
+  //ROOT::EnableThreadSafety();
 
   TString inputDir = "none";
-  TString outputDir = "test";
-  int nThreads = 1;
-  int nEvents = 1;
+  TString outputDir = "ruvdup90";
+  //TString outputDir = "ruv90";
+  int nThreads = 10;
+  int nEvents = 10;
   int nParticles = 90;
   double etaMin = 1.55;
   double etaMax = 1.951;
@@ -234,7 +235,7 @@ int main(int argc, char *argv[]){
   spCfg.maxHiDeltaPStrawId2 = 5;  spCfg.maxHiDeltaMStrawId2 = 8;  // ST2
   spCfg.maxHiDeltaPStrawId3 = 6;  spCfg.maxHiDeltaMStrawId3 = 10; // ST4
   spCfg.minMeasPerCand = minMeasPerCand;
-  spCfg.maxChi2 = 10;
+  spCfg.maxChi2 = 5;
   spCfg.maximumIterations = 100000;
   spCfg.maximumSharedStraws = 3;
   spCfg.maximumAllowedCandidatesPerStraw = 3;
@@ -257,7 +258,7 @@ int main(int argc, char *argv[]){
   int iB = 0;
   int iM = ftdGeo->GetNumberOfLayers() / 2;
   int iF = ftdGeo->GetNumberOfLayers() - 1;
-  double vzMax = 50;
+  double vzMax = 20;
   double radLengthPerSeed = 0.01;
 
   ActsExamples::SeedingAlgorithm::Config seedingCfg;
@@ -279,6 +280,7 @@ int main(int argc, char *argv[]){
   seedingCfg.seedFinderConfig.collisionRegionMin = -vzMax*cm; // important at low momenta due to mult scattering effects
   seedingCfg.seedFinderConfig.collisionRegionMax = +vzMax*cm; // important at low momenta due to mult scattering effects
   seedingCfg.seedFinderConfig.radLengthPerSeed   = radLengthPerSeed;
+  seedingCfg.seedFinderConfig.maxSeedsPerSpM = 5;
 
   // copy relevant options to grid config
   seedingCfg.gridConfig.rMax        = seedingCfg.seedFinderConfig.rMax;
@@ -343,9 +345,9 @@ int main(int argc, char *argv[]){
   ActsExamples::GreedyAmbiguityResolutionAlgorithm::Config ambigResCfg;
   ambigResCfg.inputTracks = ckf_tracks;
   ambigResCfg.outputTracks = tracks;
-  ambigResCfg.nMeasurementsMin = 15;
-  ambigResCfg.maximumSharedHits = 2;
-  ambigResCfg.maximumIterations = 10000;
+  ambigResCfg.nMeasurementsMin = 12;
+  ambigResCfg.maximumSharedHits = 1;
+  ambigResCfg.maximumIterations = 100000;
 
   // Track truth matcher
   ActsExamples::TrackTruthMatcher::Config trackTruthMatcherCfg;
@@ -355,7 +357,7 @@ int main(int argc, char *argv[]){
   trackTruthMatcherCfg.outputTrackParticleMatching = track_particle_matching;
   trackTruthMatcherCfg.outputParticleTrackMatching = particle_track_matching;
   trackTruthMatcherCfg.doubleMatching = false;
-  trackTruthMatcherCfg.matchingRatio = 0.8;
+  trackTruthMatcherCfg.matchingRatio = 0.55;
 
   // Particle writer config
   ActsExamples::RootParticleWriter::Config particleWriterCfg;
