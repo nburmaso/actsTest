@@ -23,6 +23,7 @@ MyFtdGeo* ftdGeo = nullptr;
 
 bool isGoodFtd(int64_t layerMask, int minHits = 5){
   vector<int> nHits(nStations,0); // number of hits per station
+  vector<int> nType4(nStations,0); // number of type4 hits per station
   vector<int> nType5(nStations,0); // number of type5 hits per station
   vector<int> nType6(nStations,0); // number of type6 hits per station
   for (int st=0;st<nStations;st++){
@@ -31,6 +32,7 @@ bool isGoodFtd(int64_t layerMask, int minHits = 5){
       int type = ftdGeo->GetLayerType(layerIndex);
       if (type==2) continue;
       nHits[st] += TESTBIT(layerMask,layerIndex);
+      if (type==4) nType4[st] += TESTBIT(layerMask,layerIndex);
       if (type==5) nType5[st] += TESTBIT(layerMask,layerIndex);
       if (type==6) nType6[st] += TESTBIT(layerMask,layerIndex);
     }
@@ -41,6 +43,11 @@ bool isGoodFtd(int64_t layerMask, int minHits = 5){
   if (nHits[2]<minMeasPerCand) return 0;
   if (nHits[3]<minMeasPerCand) return 0;
   if (nHits[4]<minMeasPerCand) return 0;
+  if (nType4[0]==0) return 0;
+  if (nType4[1]==0) return 0;
+  if (nType4[2]==0) return 0;
+  if (nType4[3]==0) return 0;
+  if (nType4[4]==0) return 0;
   if (nType5[0]==0) return 0;
   if (nType5[1]==0) return 0;
   if (nType5[2]==0) return 0;
@@ -74,6 +81,7 @@ bool isGoodRecoFtd(int64_t layerMask, int minHits = 5){
 
 bool isGoodSeed(int64_t layerMask, int minHits = 5){
   vector<int> nHits(nStations,0); // number of hits per station
+  vector<int> nType4(nStations,0); // number of type4 hits per station
   vector<int> nType5(nStations,0); // number of type5 hits per station
   vector<int> nType6(nStations,0); // number of type6 hits per station
   for (int st=0;st<nStations;st++){
@@ -82,6 +90,7 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5){
       int type = ftdGeo->GetLayerType(layerIndex);
       if (type==2) continue;
       nHits[st] += TESTBIT(layerMask,layerIndex);
+      if (type==4) nType4[st] += TESTBIT(layerMask,layerIndex);
       if (type==5) nType5[st] += TESTBIT(layerMask,layerIndex);
       if (type==6) nType6[st] += TESTBIT(layerMask,layerIndex);
     }
@@ -89,6 +98,9 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5){
   if (nHits[0]<minMeasPerCand) return 0;
   if (nHits[2]<minMeasPerCand) return 0;
   if (nHits[4]<minMeasPerCand) return 0;
+  if (nType4[0]==0) return 0;
+  if (nType4[2]==0) return 0;
+  if (nType4[4]==0) return 0;
   if (nType5[0]==0) return 0;
   if (nType5[2]==0) return 0;
   if (nType5[4]==0) return 0;
@@ -98,8 +110,9 @@ bool isGoodSeed(int64_t layerMask, int minHits = 5){
   return 1;
 }
 
-
 void analyse_performance(TString dir = "../build/ruvdup90/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
+
+//void analyse_performance(TString dir = "../build/ruvdup90/", double etaMean = 1.75, double etaDif = 0.2, bool refit = 0, bool trackable = 1){
 // gStyle->SetOptStat(0);
   ftdGeo = new MyFtdGeo();
   #define axisPt 20,0.,1.
