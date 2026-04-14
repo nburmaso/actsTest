@@ -141,7 +141,7 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
   TH1D* hNumberOfMatchedPi = new TH1D("hNumberOfMatchedPi","",axisPt);
   TH1D* hLayers = new TH1D("hLayers","",40,0,40);
   TH1D* hNLayers = new TH1D("hNLayers","layers",40,0,40);
-
+  TH1D* hNTracks = new TH1D("hNTracks","",10000,0,10000);
   // setup particles
   TFile* fPart = new TFile(TString(dir + "particles.root"));
   TTree* tPart = (TTree*) fPart->Get("particles");
@@ -170,6 +170,7 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
 
   int nEvents = tPart->GetEntries();
 
+  vector<bool> vGoodEvent(nEvents,0);
   vector<vector<int64_t>> vFtdLayerMask(nEvents);
   vector<vector<int>> vMatched(nEvents);
   vector<vector<int>> vNumberOfMatched(nEvents);
@@ -181,7 +182,7 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
   for (int ev=0;ev<nEvents;ev++){ // unordered events (note: ev is not thread safe)
     tPart->GetEntry(ev);
     int nParts = part_pdg->size();
-    printf("nParts=%d\n",nParts);
+    // printf("nParts=%d\n",nParts);
     // counting particles from 1 => increase allocated vector size by 1
     vFtdLayerMask[part_event_id].resize(nParts+1,0);
     vMatched[part_event_id].resize(nParts+1,0);
@@ -200,8 +201,11 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
   SetBranchAddresses(tTrack);
 
   for (int ev=0; ev<nEvents; ev++){ // unordered events (note: ev is not thread safe)
-    if (ev%100==0) printf("Event = %d\n",ev);
+    if (ev%10000==0) printf("Event = %d\n",ev);
     tTrack->GetEntry(ev);
+    hNTracks->Fill(m_majorityParticleId->size());
+    if (m_majorityParticleId->size()>100) continue;
+    vGoodEvent[m_eventNr]=1;
     for (int it=0; it<m_majorityParticleId->size(); it++){
       int ip = ActsFatras::Barcode().withData(m_majorityParticleId->at(it)).particle();
       if (ip<1) continue;
@@ -240,6 +244,7 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
   int previous_event = -1;
   for (int im=0; im<tMeas->GetEntries(); im++){
     tMeas->GetEntry(im);
+    if (!vGoodEvent[meas_event_id]) continue;
     if (meas_event_id!=previous_event) {
       if (meas_event_id%100==0) printf("Event=%d\n", meas_event_id);
       previous_event = meas_event_id;
@@ -280,6 +285,8 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
   int previous_sevent_id = -1;
   for (int is=0;is<tSpacepoints->GetEntries();is++){
     tSpacepoints->GetEntry(is);
+    if (!vGoodEvent[sevent_id]) continue;
+
     if (previous_sevent_id!=sevent_id){
       previous_sevent_id = sevent_id;
       if (sevent_id%100==0) printf("%d\n",sevent_id);
@@ -288,7 +295,7 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
     int station = ftdGeo->GetLayerStation(layerIndex);
     int majorityId = trunc(smajority);
     float majFrac = (smajority - majorityId) * 10.;
-    printf("majorityId=%d majFrac=%f\n", majorityId, majFrac);
+    //printf("majorityId=%d majFrac=%f\n", majorityId, majFrac);
     if (majFrac > minMajFrac) {
       if (station==0) vSpoints0[sevent_id][majorityId] += 1;
       if (station==2) vSpoints2[sevent_id][majorityId] += 1;
@@ -312,6 +319,7 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
   int previous_seed_event_id = -1;
   for (int is=0;is<tSeeds->GetEntries();is++){
     tSeeds->GetEntry(is);
+    if (!vGoodEvent[seed_event_id]) continue;
     if (previous_seed_event_id!=seed_event_id){
       previous_seed_event_id = seed_event_id;
       if (seed_event_id%100==0) printf("%d\n",seed_event_id);
@@ -330,6 +338,7 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
 
   for (int ev=0;ev<nEvents;ev++){ // unordered events (note: ev is not thread safe)
     tPart->GetEntry(ev);
+    if (!vGoodEvent[part_event_id]) continue;
     for (int i=0;i<part_pdg->size();i++){ // particles
       int ip = i+1;
       if (part_mid->at(i)>0) continue; // only primaries
@@ -352,7 +361,7 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
       if (abs(pdg)== 211) hSeedableEtaPi->Fill(eta);
       if (abs(pdg)==2212) hSeedableEtaPr->Fill(eta);
       if (vSeeds[part_event_id][ip]==0) continue;
-      if (vSeeds[part_event_id][ip]>1) printf("Warning: seeds = %d\n",vSeeds[part_event_id][ip]);
+      //if (vSeeds[part_event_id][ip]>1) printf("Warning: seeds = %d\n",vSeeds[part_event_id][ip]);
       if (abs(pdg)== 211) hSeedPtPi->Fill(pt);
       if (abs(pdg)==2212) hSeedPtPr->Fill(pt);
       if (abs(pdg)== 211) hSeedPhiPi->Fill(phi);
@@ -382,6 +391,9 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
   printf("nSeeds/nSeedable=%.0f/%.0f=%f\n",nSeeds,nSeedable, nSeeds/nSeedable);
   printf("nBest/nSeeds=%.0f/%.0f=%f\n",nBest,nSeeds,nBest/nSeeds);
   printf("nRc/nBest=%.0f/%.0f=%f\n",nRc,nBest,nRc/nBest);
+
+  new TCanvas;
+  hNTracks->Draw();
 
   new TCanvas;
   hLayers->Draw();
@@ -449,7 +461,8 @@ void analyse_performance(TString dir = "../build/test/", double etaMean = 1.75, 
   hNLayers->Write();
   hPtResVsPtPi->Write();
   hPtResVsPtPr->Write();
-
+  hNTracks->Write();
+  
   fout->Close();
 
 }
